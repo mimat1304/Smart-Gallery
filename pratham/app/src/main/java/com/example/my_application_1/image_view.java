@@ -4,9 +4,10 @@ import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -40,6 +41,14 @@ public class image_view extends AppCompatActivity {
         ImageView img = findViewById(R.id.imageView);
         img.setImageBitmap(BitmapFactory.decodeFile(filePath));
 
+        TextView title = findViewById(R.id.textView2);
+        title.setText(filePath);
+
+        Button back = findViewById(R.id.button6);
+        back.setEnabled(false);
+
+        Button delete = findViewById(R.id.deleteButton);
+        delete.setEnabled(false);
     }
 
     public void shareImage(View v) {

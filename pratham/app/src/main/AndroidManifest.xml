@@ -24,7 +24,8 @@
         </provider>
         <activity
             android:name=".image_view"
-            android:exported="false" />
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
         <activity
             android:name=".MainActivity"
             android:exported="true">
