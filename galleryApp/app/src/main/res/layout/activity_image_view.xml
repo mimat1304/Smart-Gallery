@@ -84,4 +84,13 @@
         app:layout_constraintTop_toBottomOf="@+id/constraintLayout2"
         tools:srcCompat="@tools:sample/avatars" />
 
+    <com.example.my_application_1.FaceRectView
+        android:id="@+id/faceRectView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentBottom="true" />
+
+
+
 </androidx.constraintlayout.widget.ConstraintLayout>

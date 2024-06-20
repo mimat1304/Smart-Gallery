@@ -76,9 +76,9 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     public void onImageClick(String imagePath) {
         Toast.makeText(this, "Clicked on image: " + imagePath, Toast.LENGTH_SHORT).show();
 
-        Intent openPhoto = new Intent(this, image_view.class);
-        openPhoto.putExtra("filePath", imagePath);
-        startActivity(openPhoto);
+        Intent detectFace = new Intent(this, FaceDetection_Activity.class);
+        detectFace.putExtra("filePath", imagePath);
+        startActivity(detectFace);
     }
 
     private List<String> loadImagesFromGallery() {

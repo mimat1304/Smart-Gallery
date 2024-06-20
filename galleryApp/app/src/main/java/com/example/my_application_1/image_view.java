@@ -2,6 +2,7 @@ package com.example.my_application_1;
 
 import android.content.Intent;
 import android.graphics.BitmapFactory;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
@@ -17,6 +18,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import java.io.File;
+import java.util.ArrayList;
 
 
 public class image_view extends AppCompatActivity {
@@ -49,6 +51,13 @@ public class image_view extends AppCompatActivity {
 
         Button delete = findViewById(R.id.deleteButton);
         delete.setEnabled(false);
+
+        if(intent.hasExtra("rect_list")){
+            ArrayList<Rect> rects=intent.getParcelableArrayListExtra("rect_list");
+            FaceRectView faceRectView = findViewById(R.id.faceRectView);
+            faceRectView.setRects(rects);
+        }
+
     }
 
     public void shareImage(View v) {
