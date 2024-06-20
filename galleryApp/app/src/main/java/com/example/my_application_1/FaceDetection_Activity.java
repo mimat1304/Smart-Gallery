@@ -33,33 +33,6 @@ public class FaceDetection_Activity extends AppCompatActivity{
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        Intent intent = getIntent();
-        String filePath = intent.getStringExtra("filePath");
-
-        File file = new File(filePath);
-        Uri uri = FileProvider.getUriForFile(this, getApplicationContext().getPackageName() + ".provider", file);
-
-        processImage(this,uri);
-
-        FaceDetectionCallback callback=new FaceDetectionCallback() {
-            @Override
-            public void onFacesDetected(ArrayList<Rect> faces) {
-                Intent openPhoto = new Intent(FaceDetection_Activity.this, image_view.class);
-                openPhoto.putParcelableArrayListExtra("rect_list", faces);
-                openPhoto.putExtra("filePath", filePath);
-                startActivity(openPhoto);
-            }
-
-            @Override
-            public void onFaceDetectionFailed(Exception e) {
-                Intent openPhoto = new Intent(FaceDetection_Activity.this, image_view.class);
-                openPhoto.putExtra("filePath", filePath);
-                startActivity(openPhoto);
-            }
-        };
-        detectFaces(callback);
-
     }
     protected void processImage(Context context,Uri uri){
         if (context == null) {
