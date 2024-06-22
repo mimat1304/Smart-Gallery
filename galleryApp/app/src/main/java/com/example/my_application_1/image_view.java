@@ -21,6 +21,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 
 
@@ -76,13 +77,8 @@ public class image_view extends AppCompatActivity {
             @Override
             public void onFacesDetected(ArrayList<Rect> faces) {
                 rects=faces;
-                Log.d("No._of_faces_detected: ",""+rects.size());
-                int ptr=0;
-                for(Rect rect:rects){
-                    ptr++;
-                    Log.d("Coordinates of face "+ptr," left: "+rect.left+" right: "+rect.right+" top: "+rect.top+" bottom: "+rect.bottom);
-                }
                 crop_faces(rects);
+                extractEmbeddings();
             }
 
             @Override
@@ -113,5 +109,15 @@ public class image_view extends AppCompatActivity {
         ListView listView = findViewById(R.id.face_list_view);
         FacesAdapter adapter = new FacesAdapter(this, croppedFaces);
         listView.setAdapter(adapter);
+    }
+    protected void extractEmbeddings(){
+        try {
+            FaceNetEmbeddings faceNetEmbeddings = new FaceNetEmbeddings(this,"facenet.tflite");
+            float[][] embeddings = faceNetEmbeddings.getEmbeddings(croppedFaces);
+            Log.d("Embeddings status:", "Generated");
+        }
+        catch(IOException e){
+            e.printStackTrace();
+        }
     }
 }

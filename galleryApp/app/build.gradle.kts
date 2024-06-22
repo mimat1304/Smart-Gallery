@@ -29,6 +29,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
+    androidResources{
+        noCompress+="tflite"
+    }
 }
 
 dependencies {
@@ -44,4 +47,5 @@ dependencies {
     implementation ("com.github.bumptech.glide:glide:4.11.0")
     annotationProcessor ("com.github.bumptech.glide:compiler:4.11.0")
     implementation ("com.google.mlkit:face-detection:16.1.6")
+    implementation ("org.tensorflow:tensorflow-lite:2.16.1")
 }
