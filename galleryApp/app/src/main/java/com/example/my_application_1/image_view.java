@@ -23,8 +23,8 @@ import androidx.core.view.WindowInsetsCompat;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-
-
+import java.util.Arrays;
+import java.util.List;
 
 
 public class image_view extends AppCompatActivity {
@@ -33,6 +33,7 @@ public class image_view extends AppCompatActivity {
     public String filePath;
     public ArrayList<Rect>rects;
     private ArrayList<Bitmap> croppedFaces;
+    private float[][] embeddings;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -104,20 +105,27 @@ public class image_view extends AppCompatActivity {
                     faceRect.width(), faceRect.height());
             croppedFaces.add(face);
         }
-
-        // Set up the adapter and ListView
-        ListView listView = findViewById(R.id.face_list_view);
-        FacesAdapter adapter = new FacesAdapter(this, croppedFaces);
-        listView.setAdapter(adapter);
     }
     protected void extractEmbeddings(){
         try {
             FaceNetEmbeddings faceNetEmbeddings = new FaceNetEmbeddings(this,"facenet.tflite");
-            float[][] embeddings = faceNetEmbeddings.getEmbeddings(croppedFaces);
+            embeddings = faceNetEmbeddings.getEmbeddings(croppedFaces);
             Log.d("Embeddings status:", "Generated");
+            // use of embeddings to be implemented
         }
         catch(IOException e){
             e.printStackTrace();
         }
+    }
+    public void showEmbeddings(View v){
+        setContentView(R.layout.activity_show_embeddings);
+        List<embeddings_list_item> items=new ArrayList<>();
+        for(int i=0;i<croppedFaces.size();i++){
+            items.add(new embeddings_list_item(croppedFaces.get(i), Arrays.toString(embeddings[i])));
+        }
+        ListView listView= findViewById((R.id.face_list_view_1));
+        FacesAdapter adapter =new FacesAdapter(this,R.layout.cropped_faces,items);
+        listView.setAdapter(adapter);
+
     }
 }

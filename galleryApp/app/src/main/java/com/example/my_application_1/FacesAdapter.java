@@ -1,36 +1,45 @@
 package com.example.my_application_1;
 
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.ArrayAdapter;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 
-import java.util.ArrayList;
+import java.util.List;
 
-public class FacesAdapter extends ArrayAdapter<Bitmap> {
+public class FacesAdapter extends ArrayAdapter<embeddings_list_item> {
 
-    public FacesAdapter(@NonNull Context context, @NonNull ArrayList<Bitmap> faces) {
-        super(context, 0, faces);
+    private Context context;
+    private int resource;
+    private List<embeddings_list_item> items;
+
+    public FacesAdapter(@NonNull Context context, int resource, @NonNull List<embeddings_list_item> items) {
+        super(context, resource, items);
+        this.context=context;
+        this.resource=resource;
+        this.items=items;
     }
 
     @NonNull
     @Override
     public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
-        Bitmap face = getItem(position);
-
         if (convertView == null) {
-            convertView = LayoutInflater.from(getContext()).inflate(R.layout.cropped_faces, parent, false);
+            LayoutInflater inflater = LayoutInflater.from(context);
+            convertView = inflater.inflate(resource, parent, false);
         }
 
         ImageView imageView = convertView.findViewById(R.id.Face);
-        imageView.setImageBitmap(face);
+        TextView textView = convertView.findViewById(R.id.embeddings);
+
+        embeddings_list_item currentItem = items.get(position);
+        imageView.setImageBitmap(currentItem.getBitmap());
+        textView.setText(currentItem.getEmbeddings());
 
         return convertView;
     }
