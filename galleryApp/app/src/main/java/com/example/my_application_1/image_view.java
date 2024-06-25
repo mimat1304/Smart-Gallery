@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -25,6 +26,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 
 public class image_view extends AppCompatActivity {
@@ -34,6 +37,11 @@ public class image_view extends AppCompatActivity {
     public ArrayList<Rect>rects;
     private ArrayList<Bitmap> croppedFaces;
     private float[][] embeddings;
+    private AppDatabase db;
+    private ExecutorService faceExecutorService;
+    private ExecutorService userExecutiveService;
+    private List<User> userList;
+    private final float threshold = 0.7f;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -44,6 +52,10 @@ public class image_view extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+
+        db = AppDatabase.getInstance(getApplicationContext());
+        faceExecutorService = Executors.newSingleThreadExecutor();
+        userExecutiveService = Executors.newSingleThreadExecutor();
 
         Intent intent = getIntent();
         filePath = intent.getStringExtra("filePath");
@@ -111,7 +123,8 @@ public class image_view extends AppCompatActivity {
             FaceNetEmbeddings faceNetEmbeddings = new FaceNetEmbeddings(this,"facenet.tflite");
             embeddings = faceNetEmbeddings.getEmbeddings(croppedFaces);
             Log.d("Embeddings status:", "Generated");
-            // use of embeddings to be implemented
+
+            updateData();
         }
         catch(IOException e){
             e.printStackTrace();
@@ -126,6 +139,93 @@ public class image_view extends AppCompatActivity {
         ListView listView= findViewById((R.id.face_list_view_1));
         FacesAdapter adapter =new FacesAdapter(this,R.layout.cropped_faces,items);
         listView.setAdapter(adapter);
+    }
+    protected void updateData(){
+        // if(uid not present in image)
+            List<Face> faces= new ArrayList<>();
+            for(float[] em:embeddings){
+                faces.add(new Face(em));
+            }
+            insertFace(faces);
 
+        UserCallback callback= new UserCallback() {
+            @Override
+            public void onUsersListComplete() {
+                Log.d("Users List","Fetched");
+                for(float[] em:embeddings) {
+                    checkUsers(em);
+                }
+            }
+
+            @Override
+            public void insertComplete() {
+
+            }
+        };
+
+        getAllUsers(callback);
+
+
+    }
+    private void insertFace(List<Face> faces){
+        faceExecutorService.execute(() -> db.faceDao().insertAll(faces));
+    }
+    private void getAllUsers(UserCallback callback){
+        userExecutiveService.execute(()->{userList=db.userDao().getAll();callback.onUsersListComplete();});
+    }
+    private void checkUsers(float[] cur_em){
+        boolean flag = false;
+        for(User user: userList){
+            float[] em=user.embeddings;
+            if (similarity(em,cur_em)>=threshold){
+                userExecutiveService.execute(()->db.userDao().delete(user));
+                if(user.name.equals("Unknown")){
+                    //prompt user to enter name
+                }
+                user.embeddings=meanEmbeddings(em, cur_em, user.n);
+                user.n=user.n+1;
+                userExecutiveService.execute(()-> db.userDao().insertAll(user));
+                flag=true;
+            }
+        }
+        if(!flag){
+            // prompt user to enter name
+            userExecutiveService.execute(()->db.userDao().insertAll(new User("Unknown",1,cur_em)));
+        }
+    }
+    private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
+        float[] meanEM= new float[em.length];
+        for (int i=0;i<em.length;i++){
+            meanEM[i]=(em[i]*n+cur_em[i])/(n+1);
+        }
+        return meanEM;
+    }
+    private float similarity(float[] em1, float[] em2){
+        float dotProduct = 0.0f;
+        for (int i = 0; i < em1.length; i++) {
+            dotProduct += em1[i] * em2[i];
+        }
+        float magnitude1=0.0f,magnitude2=0.0f;
+        for (int i=0;i< em1.length;i++){
+            magnitude1+=(em1[i]*em1[i]);
+            magnitude2+=(em2[i]*em2[i]);
+        }
+        magnitude1 = (float) Math.sqrt(magnitude1);
+        magnitude2 = (float) Math.sqrt(magnitude2);
+        return dotProduct/(magnitude1*magnitude2);
+    }
+    private interface UserCallback{
+        void onUsersListComplete();
+        void insertComplete();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        faceExecutorService.shutdown();
+        userExecutiveService.shutdown();
+//        The ExecutorService shutdown in the onDestroy method ensures that:
+//        No new tasks will be accepted after the activity is destroyed.
+//        Currently running tasks are allowed to complete.
     }
 }

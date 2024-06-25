@@ -14,6 +14,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments["room.schemaLocation"] = "$projectDir/schemas"
+            }
+        }
     }
 
     buildTypes {
@@ -48,4 +53,6 @@ dependencies {
     annotationProcessor ("com.github.bumptech.glide:compiler:4.11.0")
     implementation ("com.google.mlkit:face-detection:16.1.6")
     implementation ("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation ("androidx.room:room-runtime:2.6.1")
+    annotationProcessor ("androidx.room:room-compiler:2.6.1")
 }

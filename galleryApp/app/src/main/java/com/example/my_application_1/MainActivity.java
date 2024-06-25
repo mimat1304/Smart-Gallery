@@ -20,6 +20,7 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.GridView;
 import android.widget.ListView;
 import android.widget.Toast;
 
@@ -28,7 +29,7 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements GalleryAdapter.OnImageClickListener {
 
-    private ListView galleryListView;
+    private GridView galleryListView;
     private GalleryAdapter galleryAdapter;
     private List<String> imagePaths;
 
@@ -55,7 +56,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
 
         galleryAdapter = new GalleryAdapter(this, imagePaths, this);
         galleryListView.setAdapter(galleryAdapter);
-        }
+    }
 
 
 
@@ -97,4 +98,3 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         return imagePaths;
     }
 }
-
