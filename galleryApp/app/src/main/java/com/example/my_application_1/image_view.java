@@ -42,6 +42,7 @@ public class image_view extends AppCompatActivity {
     private ExecutorService userExecutiveService;
     private List<User> userList;
     private final float threshold = 0.7f;
+    List<Face> faces= new ArrayList<>();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -142,7 +143,7 @@ public class image_view extends AppCompatActivity {
     }
     protected void updateData(){
         // if(uid not present in image)
-            List<Face> faces= new ArrayList<>();
+
             for(float[] em:embeddings){
                 faces.add(new Face(em));
             }
@@ -184,13 +185,19 @@ public class image_view extends AppCompatActivity {
                 }
                 user.embeddings=meanEmbeddings(em, cur_em, user.n);
                 user.n=user.n+1;
-                userExecutiveService.execute(()-> db.userDao().insertAll(user));
+                userExecutiveService.execute(()-> {
+                    db.userDao().insertAll(user);
+                });
                 flag=true;
+
+                break;
             }
         }
         if(!flag){
             // prompt user to enter name
-            userExecutiveService.execute(()->db.userDao().insertAll(new User("Unknown",1,cur_em)));
+            userExecutiveService.execute(()-> {
+                db.userDao().insertAll(new User("Unknown", 1, cur_em));
+            });
         }
     }
     private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
