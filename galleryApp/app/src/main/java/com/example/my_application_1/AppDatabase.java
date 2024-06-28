@@ -6,12 +6,11 @@ import androidx.room.Room;
 import androidx.room.RoomDatabase;
 import androidx.room.TypeConverters;
 
-@Database(entities = {User.class, Face.class}, version = 2,exportSchema = true)
+@Database(entities = {User.class, Face.class}, version = 4,exportSchema = true)
 @TypeConverters(Converters.class)
 public abstract class AppDatabase extends RoomDatabase {
     public abstract UserDao userDao();
     public abstract FaceDao faceDao();
-
     private static volatile AppDatabase INSTANCE;
 
     public static AppDatabase getInstance(Context context) {

@@ -27,13 +27,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class FaceDetection_Activity extends AppCompatActivity{
+public class FaceDetection_Activity{
     InputImage image;
-
-    @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-    }
     protected void processImage(Context context,Uri uri){
         if (context == null) {
             throw new IllegalArgumentException("Context cannot be null");

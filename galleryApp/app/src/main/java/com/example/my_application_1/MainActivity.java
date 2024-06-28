@@ -4,6 +4,9 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
 
@@ -12,6 +15,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -24,14 +28,31 @@ import android.widget.GridView;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity implements GalleryAdapter.OnImageClickListener {
 
     private GridView galleryListView;
     private GalleryAdapter galleryAdapter;
     private List<String> imagePaths;
+    public ArrayList<Rect>rects;
+    private ArrayList<Bitmap> croppedFaces;
+    private float[][] embeddings;
+
+    List<User>userList;
+    private AppDatabase db;
+    private ExecutorService userExecutiveService;
+    private ExecutorService executiveService;
+
+    List<Face> Faces;
+
 
     private static final int REQUEST_CODE_PERMISSIONS = 100;
 
@@ -51,15 +72,33 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_CODE_PERMISSIONS);
         }
 
+        db = AppDatabase.getInstance(getApplicationContext());
+        userExecutiveService = Executors.newSingleThreadExecutor();
+        executiveService = Executors.newSingleThreadExecutor();
+
         galleryListView = findViewById(R.id.gallery);
         imagePaths = loadImagesFromGallery();
 
         galleryAdapter = new GalleryAdapter(this, imagePaths, this);
         galleryListView.setAdapter(galleryAdapter);
+        MainActivity.UserCallback callback= new MainActivity.UserCallback() {
+            @Override
+            public void onUsersListComplete() {
+                Log.d("Users List","Fetched"+userList.size());
+                executiveService.execute(()->processData());
+            }
+
+            @Override
+            public void faceFetchComplete() {
+
+            }
+        };
+
+        getAllUsers(callback);
     }
-
-
-
+    private void getAllUsers(MainActivity.UserCallback callback){
+        userExecutiveService.execute(()->{userList=db.userDao().getAll();callback.onUsersListComplete();});
+    }
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -97,4 +136,146 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         }
         return imagePaths;
     }
+
+    private void processData(){
+        for(String filePath: imagePaths){
+            galleryListView.setAdapter(galleryAdapter);
+            MainActivity.UserCallback callback= new MainActivity.UserCallback() {
+                @Override
+                public void onUsersListComplete() {
+                }
+
+                @Override
+                public void faceFetchComplete() {
+
+                    if(Faces.isEmpty()) {
+                        faceDetection(filePath);
+                    }
+                    else{
+                        for(Face face:Faces)
+                        Log.d("faceFetchComplete", ""+face.uid);
+                    }
+                }
+            };
+            userExecutiveService.execute(()-> {
+                Faces=db.faceDao().loadByFilePath(filePath);
+                callback.faceFetchComplete();
+            });
+        }
+    }
+    protected void faceDetection(String filePath){
+        FaceDetectionCallback callback= new FaceDetectionCallback() {
+            @Override
+            public void onFacesDetected(ArrayList<Rect> faces) {
+                rects=faces;
+                crop_faces(filePath);
+                extractEmbeddings(filePath);
+            }
+
+            @Override
+            public void onFaceDetectionFailed(Exception e) {
+
+            }
+        };
+        File file = new File(filePath);
+        Uri uri = FileProvider.getUriForFile(this, getApplicationContext().getPackageName() + ".provider", file);
+        FaceDetection_Activity faceDetectionActivity= new FaceDetection_Activity();
+        faceDetectionActivity.processImage(this,uri);
+        faceDetectionActivity.detectFaces(callback);
+
+    }
+    protected void crop_faces(String filePath) {
+        Bitmap image = BitmapFactory.decodeFile(filePath);
+        croppedFaces = new ArrayList<>();
+
+        // Crop each face and add to the list
+        for (Rect faceRect : rects) {
+            Bitmap face = Bitmap.createBitmap(image, faceRect.left, faceRect.top,
+                    faceRect.width(), faceRect.height());
+            croppedFaces.add(face);
+        }
+    }
+    protected void extractEmbeddings(String filePath){
+        try {
+            FaceNetEmbeddings faceNetEmbeddings = new FaceNetEmbeddings(this,"facenet.tflite");
+            embeddings = faceNetEmbeddings.getEmbeddings(croppedFaces);
+            Log.d("Embeddings status:", "Generated");
+            updateData(filePath);
+        }
+        catch(IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    protected void updateData(String filePath){
+        for(float[] em:embeddings){
+            checkUsers(em,filePath);
+        }
+    }
+    private void checkUsers(float[] cur_em,String filePath){
+        boolean flag = false;
+        float threshold=0.75f;
+        for(User user: userList){
+            float[] em=user.embeddings;
+            if (similarity(em,cur_em)>=threshold){
+                userExecutiveService.execute(()->db.userDao().delete(user));
+                userList.remove(user);
+                user.embeddings=meanEmbeddings(em, cur_em, user.n);
+                user.n=user.n+1;
+                Face face =new Face(cur_em,filePath,user.uid);
+                userList.add(user);
+                userExecutiveService.execute(()->{
+                    db.userDao().insert(user);
+                    db.faceDao().insert(face);
+                });
+
+                flag=true;
+                break;
+            }
+        }
+        if(!flag){
+            // prompt user to enter name
+            User user= new User("Unknown", 1, cur_em);
+            Face face =new Face(cur_em,filePath,user.uid);
+            userList.add(user);
+            userExecutiveService.execute(()->{
+                db.userDao().insert(user);
+                db.faceDao().insert(face);
+            });
+        }
+    }
+    private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
+        float[] meanEM= new float[em.length];
+        for (int i=0;i<em.length;i++){
+            meanEM[i]=(em[i]*n+cur_em[i])/(n+1);
+        }
+        return meanEM;
+    }
+    private float similarity(float[] em1, float[] em2){
+        float dotProduct = 0.0f;
+        for (int i = 0; i < em1.length; i++) {
+            dotProduct += em1[i] * em2[i];
+        }
+        float magnitude1=0.0f,magnitude2=0.0f;
+        for (int i=0;i< em1.length;i++){
+            magnitude1+=(em1[i]*em1[i]);
+            magnitude2+=(em2[i]*em2[i]);
+        }
+        magnitude1 = (float) Math.sqrt(magnitude1);
+        magnitude2 = (float) Math.sqrt(magnitude2);
+        return dotProduct/(magnitude1*magnitude2);
+    }
+    private interface UserCallback{
+        void onUsersListComplete();
+        void faceFetchComplete();
+    }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        userExecutiveService.shutdown();
+        //        The ExecutorService shutdown in the onDestroy method ensures that:
+        //        No new tasks will be accepted after the activity is destroyed.
+        //        Currently running tasks are allowed to complete.
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.example.my_application_1;
 
+import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 import androidx.room.TypeConverters;
@@ -10,8 +11,15 @@ public class Face {
     public int uid;
     @TypeConverters(Converters.class)
     public float[] embeddings;
+    @ColumnInfo(name="filePath")
+    String filePath;
 
-    public Face(float[] embeddings){
+    @ColumnInfo(name="fKey")
+    int fKey;
+
+    public Face(float[] embeddings,String filePath,int fKey){
         this.embeddings=embeddings;
+        this.filePath=filePath;
+        this.fKey=fKey;
     }
 }

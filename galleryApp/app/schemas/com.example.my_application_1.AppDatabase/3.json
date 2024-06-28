@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 2,
-    "identityHash": "78c098f9ce549ba801a52fe794e6b2c0",
+    "version": 3,
+    "identityHash": "dc53dcf6bafbd35c806dcd6f00d4814c",
     "entities": [
       {
         "tableName": "User",
@@ -44,7 +44,7 @@
       },
       {
         "tableName": "Face",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uid` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `embeddings` BLOB, `filePath` TEXT, `Foreign Key` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uid` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `embeddings` BLOB, `filePath` TEXT, `fKey` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "uid",
@@ -66,7 +66,7 @@
           },
           {
             "fieldPath": "fKey",
-            "columnName": "Foreign Key",
+            "columnName": "fKey",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -84,7 +84,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '78c098f9ce549ba801a52fe794e6b2c0')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'dc53dcf6bafbd35c806dcd6f00d4814c')"
     ]
   }
 }

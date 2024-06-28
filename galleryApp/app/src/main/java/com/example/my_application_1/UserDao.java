@@ -19,9 +19,18 @@ public interface UserDao {
     User findByUID(int uid);
 
     @Insert
-    void insertAll(User... users);
+    void insert(User user);
+
+    @Insert
+    void insertAll(List<User>users);
+
+    @Delete
+    void deleteAll(List<User>users);
 
     @Delete
     void delete(User user);
+
+    @Query("DELETE FROM User")
+    void clearTable();
 
 }

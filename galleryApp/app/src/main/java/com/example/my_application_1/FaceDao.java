@@ -10,15 +10,20 @@ import java.util.List;
 @Dao
 public interface FaceDao {
     @Insert
-    public void insertAll(List<Face> face);
+    void insertAll(List<Face> face);
 
-    @Query("SELECT * FROM Face WHERE uid = :uid")
-    Face findByUID(int uid);
+    @Insert
+    void insert(Face face);
+    @Query("SELECT * FROM Face WHERE fKey = :fKey")
+    Face findByfKey(int fKey);
 
+    @Query("SELECT * FROM Face WHERE filePath =:filePath")
+    List<Face> loadByFilePath(String filePath);
     @Query("SELECT * FROM Face WHERE uid IN (:userIds)")
     List<Face> loadAllByIds(int[] userIds);
 
     @Delete
     void delete(Face face);
-
+    @Query("DELETE FROM Face")
+    void clearTable();
 }
