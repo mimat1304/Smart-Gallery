@@ -139,7 +139,6 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
 
     private void processData(){
         for(String filePath: imagePaths){
-            galleryListView.setAdapter(galleryAdapter);
             MainActivity.UserCallback callback= new MainActivity.UserCallback() {
                 @Override
                 public void onUsersListComplete() {
@@ -152,8 +151,9 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                         faceDetection(filePath);
                     }
                     else{
-                        for(Face face:Faces)
-                        Log.d("faceFetchComplete", ""+face.uid);
+                        for(Face face:Faces) {
+                            Log.d("faceFetchComplete", "" + face.uid);
+                        }
                     }
                 }
             };
@@ -214,18 +214,17 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     }
     private void checkUsers(float[] cur_em,String filePath){
         boolean flag = false;
-        float threshold=0.75f;
+        float threshold=0.6f;
         for(User user: userList){
             float[] em=user.embeddings;
             if (similarity(em,cur_em)>=threshold){
-                userExecutiveService.execute(()->db.userDao().delete(user));
                 userList.remove(user);
                 user.embeddings=meanEmbeddings(em, cur_em, user.n);
                 user.n=user.n+1;
                 Face face =new Face(cur_em,filePath,user.uid);
                 userList.add(user);
                 userExecutiveService.execute(()->{
-                    db.userDao().insert(user);
+                    db.userDao().updateUser(user);
                     db.faceDao().insert(face);
                 });
 
