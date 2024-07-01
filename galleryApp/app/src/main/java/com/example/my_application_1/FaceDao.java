@@ -17,6 +17,8 @@ public interface FaceDao {
     @Query("SELECT * FROM Face WHERE fKey = :fKey")
     Face findByfKey(int fKey);
 
+    @Query("SELECT filePath from Face")
+    List<String> loadAllFiles();
     @Query("SELECT * FROM Face WHERE filePath =:filePath")
     List<Face> loadByFilePath(String filePath);
     @Query("SELECT * FROM Face WHERE uid IN (:userIds)")

@@ -1,12 +1,12 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 4,
-    "identityHash": "59558566ee7e51778f8941bbd21ad85a",
+    "version": 5,
+    "identityHash": "537c4e4843c3333ec42808f91f145e27",
     "entities": [
       {
         "tableName": "User",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uid` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `Number of images` INTEGER NOT NULL, `Name` TEXT, `embeddings` BLOB)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uid` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `Number of images` INTEGER NOT NULL, `Name` TEXT, `fKey` INTEGER NOT NULL, `embeddings` BLOB)",
         "fields": [
           {
             "fieldPath": "uid",
@@ -25,6 +25,12 @@
             "columnName": "Name",
             "affinity": "TEXT",
             "notNull": false
+          },
+          {
+            "fieldPath": "fkey",
+            "columnName": "fKey",
+            "affinity": "INTEGER",
+            "notNull": true
           },
           {
             "fieldPath": "embeddings",
@@ -80,12 +86,12 @@
         "indices": [
           {
             "name": "index_Face_filePath",
-            "unique": true,
+            "unique": false,
             "columnNames": [
               "filePath"
             ],
             "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_Face_filePath` ON `${TABLE_NAME}` (`filePath`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Face_filePath` ON `${TABLE_NAME}` (`filePath`)"
           }
         ],
         "foreignKeys": []
@@ -94,7 +100,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '59558566ee7e51778f8941bbd21ad85a')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '537c4e4843c3333ec42808f91f145e27')"
     ]
   }
 }
