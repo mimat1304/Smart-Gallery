@@ -46,13 +46,15 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     private ArrayList<Bitmap> croppedFaces;
     private float[][] embeddings;
 
-    List<User>userList;
+    List<User>userList=new ArrayList<>();
     private AppDatabase db;
     private ExecutorService userExecutiveService;
     private ExecutorService executiveService;
 
     List<Face> Faces;
-
+    List<Face> facesToInsert;
+    List<User> usersToUpdate;
+    List<User> usersToInsert;
 
     private static final int REQUEST_CODE_PERMISSIONS = 100;
 
@@ -81,23 +83,23 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
 
         galleryAdapter = new GalleryAdapter(this, imagePaths, this);
         galleryListView.setAdapter(galleryAdapter);
-        MainActivity.UserCallback callback= new MainActivity.UserCallback() {
+        Log.d("MainActivity", "Starting background thread");
+        Thread workThread = new Thread() {
             @Override
-            public void onUsersListComplete() {
-                Log.d("Users List","Fetched"+userList.size());
-                executiveService.execute(()->processData());
-            }
-
-            @Override
-            public void faceFetchComplete() {
-
+            public void run() {
+                try {
+                    Log.d("MainActivity", "Background thread started");
+                    List<User> userList = db.userDao().getAll();
+                    Log.d("MainActivity", "UserList size= " + userList.size());
+                    processData();
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error fetching user list", e);
+                }
+                Log.d("MainActivity", "Background thread finished");
             }
         };
-
-        getAllUsers(callback);
-    }
-    private void getAllUsers(MainActivity.UserCallback callback){
-        userExecutiveService.execute(()->{userList=db.userDao().getAll();callback.onUsersListComplete();});
+        workThread.start();
+        Log.d("MainActivity", "Background thread initiated");
     }
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -139,37 +141,26 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
 
     private void processData(){
         for(String filePath: imagePaths){
-            MainActivity.UserCallback callback= new MainActivity.UserCallback() {
-                @Override
-                public void onUsersListComplete() {
+            Faces=db.faceDao().loadByFilePath(filePath);
+            if(Faces.isEmpty()) {
+                faceDetection(filePath);
+            }
+            else{
+                for(Face face:Faces) {
+                    Log.d("faceFetchComplete", "" + face.uid);
                 }
-
-                @Override
-                public void faceFetchComplete() {
-
-                    if(Faces.isEmpty()) {
-                        faceDetection(filePath);
-                    }
-                    else{
-                        for(Face face:Faces) {
-                            Log.d("faceFetchComplete", "" + face.uid);
-                        }
-                    }
-                }
-            };
-            userExecutiveService.execute(()-> {
-                Faces=db.faceDao().loadByFilePath(filePath);
-                callback.faceFetchComplete();
-            });
+            }
         }
     }
     protected void faceDetection(String filePath){
         FaceDetectionCallback callback= new FaceDetectionCallback() {
             @Override
             public void onFacesDetected(ArrayList<Rect> faces) {
-                rects=faces;
-                crop_faces(filePath);
-                extractEmbeddings(filePath);
+                userExecutiveService.submit(() -> {
+                    rects = faces;
+                    crop_faces(filePath);
+                    extractEmbeddings(filePath);
+                });
             }
 
             @Override
@@ -182,7 +173,6 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         FaceDetection_Activity faceDetectionActivity= new FaceDetection_Activity();
         faceDetectionActivity.processImage(this,uri);
         faceDetectionActivity.detectFaces(callback);
-
     }
     protected void crop_faces(String filePath) {
         Bitmap image = BitmapFactory.decodeFile(filePath);
@@ -190,16 +180,20 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
 
         // Crop each face and add to the list
         for (Rect faceRect : rects) {
+            try{
             Bitmap face = Bitmap.createBitmap(image, faceRect.left, faceRect.top,
                     faceRect.width(), faceRect.height());
-            croppedFaces.add(face);
+            croppedFaces.add(face);}
+            catch(Exception e){
+
+            }
         }
     }
     protected void extractEmbeddings(String filePath){
         try {
             FaceNetEmbeddings faceNetEmbeddings = new FaceNetEmbeddings(this,"facenet.tflite");
             embeddings = faceNetEmbeddings.getEmbeddings(croppedFaces);
-            Log.d("Embeddings status:", "Generated");
+//            Log.d("Embeddings status:", "Generated");
             updateData(filePath);
         }
         catch(IOException e){
@@ -214,7 +208,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     }
     private void checkUsers(float[] cur_em,String filePath){
         boolean flag = false;
-        float threshold=0.6f;
+        float threshold=0.63f;
         for(User user: userList){
             float[] em=user.embeddings;
             if (similarity(em,cur_em)>=threshold){
@@ -223,11 +217,12 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 user.n=user.n+1;
                 Face face =new Face(cur_em,filePath,user.uid);
                 userList.add(user);
-                userExecutiveService.execute(()->{
-                    db.userDao().updateUser(user);
-                    db.faceDao().insert(face);
-                });
-
+//                usersToUpdate.add(user);
+                db.userDao().updateUser(user);
+                Log.d("Main Activity","User updated");
+//                facesToInsert.add(face);
+                db.faceDao().insert(face);
+                Log.d("Main Activity","Face Inserted");
                 flag=true;
                 break;
             }
@@ -237,10 +232,12 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             User user= new User("Unknown", 1, cur_em);
             Face face =new Face(cur_em,filePath,user.uid);
             userList.add(user);
-            userExecutiveService.execute(()->{
-                db.userDao().insert(user);
-                db.faceDao().insert(face);
-            });
+            db.userDao().insert(user);
+//            usersToInsert.add(user);
+            Log.d("Main Activity","User Inserted");
+//            facesToInsert.add(face);
+            db.faceDao().insert(face);
+            Log.d("Main Activity","Face Inserted");
         }
     }
     private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
@@ -263,10 +260,6 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         magnitude1 = (float) Math.sqrt(magnitude1);
         magnitude2 = (float) Math.sqrt(magnitude2);
         return dotProduct/(magnitude1*magnitude2);
-    }
-    private interface UserCallback{
-        void onUsersListComplete();
-        void faceFetchComplete();
     }
     @Override
     protected void onDestroy() {
