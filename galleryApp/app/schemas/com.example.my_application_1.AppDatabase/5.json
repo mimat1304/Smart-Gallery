@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "537c4e4843c3333ec42808f91f145e27",
+    "identityHash": "e856e92597f662d983765f54f3252e53",
     "entities": [
       {
         "tableName": "User",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uid` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `Number of images` INTEGER NOT NULL, `Name` TEXT, `fKey` INTEGER NOT NULL, `embeddings` BLOB)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uid` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `Number of images` INTEGER NOT NULL, `Name` TEXT, `embeddings` BLOB)",
         "fields": [
           {
             "fieldPath": "uid",
@@ -27,12 +27,6 @@
             "notNull": false
           },
           {
-            "fieldPath": "fkey",
-            "columnName": "fKey",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
             "fieldPath": "embeddings",
             "columnName": "embeddings",
             "affinity": "BLOB",
@@ -50,7 +44,7 @@
       },
       {
         "tableName": "Face",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uid` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `embeddings` BLOB, `filePath` TEXT, `fKey` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uid` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `embeddings` BLOB, `filePath` TEXT, `userID` INTEGER NOT NULL, FOREIGN KEY(`userID`) REFERENCES `User`(`uid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "uid",
@@ -71,8 +65,8 @@
             "notNull": false
           },
           {
-            "fieldPath": "fKey",
-            "columnName": "fKey",
+            "fieldPath": "userID",
+            "columnName": "userID",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -94,13 +88,25 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_Face_filePath` ON `${TABLE_NAME}` (`filePath`)"
           }
         ],
-        "foreignKeys": []
+        "foreignKeys": [
+          {
+            "table": "User",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "userID"
+            ],
+            "referencedColumns": [
+              "uid"
+            ]
+          }
+        ]
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '537c4e4843c3333ec42808f91f145e27')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e856e92597f662d983765f54f3252e53')"
     ]
   }
 }

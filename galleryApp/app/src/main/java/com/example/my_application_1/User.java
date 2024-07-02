@@ -16,17 +16,13 @@ public class User {
     @ColumnInfo(name = "Name")
     public String name;
 
-    @ColumnInfo(name = "fKey")
-    public int fkey;
-
     @ColumnInfo(name = "embeddings")
     @TypeConverters(Converters.class)
     public float[] embeddings;
 
-    public User(String name,int n, float[] embeddings,int fkey) {
+    public User(String name,int n, float[] embeddings) {
         this.n = n;
         this.name = name;
         this.embeddings = embeddings;
-        this.fkey=fkey;
     }
 }

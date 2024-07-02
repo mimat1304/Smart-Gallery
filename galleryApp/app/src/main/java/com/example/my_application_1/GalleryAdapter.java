@@ -16,17 +16,22 @@ public class GalleryAdapter extends BaseAdapter {
     private List<String> imagePaths;
     private LayoutInflater inflater;
     private OnImageClickListener onImageClickListener;
+    private OnImageLongClickListener onImageLongClickListener;
 
 
-    public GalleryAdapter(Context context, List<String> imagePaths, OnImageClickListener onImageClickListener) {
+    public GalleryAdapter(Context context, List<String> imagePaths) {
         this.context = context;
         this.imagePaths = imagePaths;
         this.inflater = LayoutInflater.from(context);
-        this.onImageClickListener = onImageClickListener;
+        this.onImageClickListener = (OnImageClickListener) context;
+        this.onImageLongClickListener = (OnImageLongClickListener) context;
     }
 
     public interface OnImageClickListener {
-        void onImageClick(String imagePath);
+        void onImageClick(String imagePath,ImageView imv);
+    }
+    public interface OnImageLongClickListener{
+        boolean onImageLongClick(String imagePath, ImageView imV);
     }
 
 
@@ -57,8 +62,9 @@ public class GalleryAdapter extends BaseAdapter {
                 .load(imagePath)
                 .into(imageView);
 
-
-        imageView.setOnClickListener(v -> onImageClickListener.onImageClick(imagePath));
+        imageView.setOnClickListener(v -> onImageClickListener.onImageClick(imagePath, imageView));
+//        imageView.setOnClickListener(v -> onImageClickListener.onImageClick(imagePath));
+        imageView.setOnLongClickListener(v -> onImageLongClickListener.onImageLongClick(imagePath, imageView));
         return convertView;
     }
 }

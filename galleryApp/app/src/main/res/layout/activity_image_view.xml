@@ -24,17 +24,17 @@
             android:onClick="shareImage"
             android:text="SHARE"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/deleteButton"
+            app:layout_constraintEnd_toStartOf="@+id/identificationButton"
             app:layout_constraintHorizontal_bias="0.5"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
         <Button
-            android:id="@+id/deleteButton"
+            android:id="@+id/identificationButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:onClick="shareImage"
-            android:text="DELETE"
+            android:onClick="identify_faces"
+            android:text="Identify faces"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.5"

@@ -14,9 +14,11 @@ public interface FaceDao {
 
     @Insert
     void insert(Face face);
-    @Query("SELECT * FROM Face WHERE fKey = :fKey")
-    Face findByfKey(int fKey);
 
+    @Query("SELECT userId FROM face WHERE filePath IN (:filePaths)")
+    List<Integer> getAllUsers(List<String> filePaths);
+    @Query("SELECT userId FROM face WHERE filePath =:filePath")
+    List<Integer> getAllUsers(String filePath);
     @Query("SELECT filePath from Face")
     List<String> loadAllFiles();
     @Query("SELECT * FROM Face WHERE filePath =:filePath")

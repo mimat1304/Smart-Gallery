@@ -10,9 +10,11 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -38,7 +40,10 @@ public class image_view extends AppCompatActivity {
     private ArrayList<Bitmap> croppedFaces;
     private float[][] embeddings;
 
-    List<Face> faces= new ArrayList<>();
+    AppDatabase db;
+    ExecutorService executorService;
+    List<Integer>userIDs;
+    List<String>names= new ArrayList<>();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -49,7 +54,8 @@ public class image_view extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-
+        db=AppDatabase.getInstance(getApplicationContext());
+        executorService=Executors.newSingleThreadExecutor();
         Intent intent = getIntent();
         filePath = intent.getStringExtra("filePath");
 
@@ -62,11 +68,70 @@ public class image_view extends AppCompatActivity {
         Button back = findViewById(R.id.button6);
         back.setEnabled(false);
 
-        Button delete = findViewById(R.id.deleteButton);
-        delete.setEnabled(false);
         faceDetection();
-    }
 
+        try {
+            executorService.submit(() -> {
+                userIDs = db.faceDao().getAllUsers(filePath);
+                for (int userID : userIDs) {
+                    names.add((db.userDao().findByUID(userID)).name);
+                }
+            });
+        }
+        catch(Exception e){
+            Log.e("image view","Error",e);
+        }
+    }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        setContentView(R.layout.activity_image_view);
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            return insets;
+        });
+        ImageView img = findViewById(R.id.imageView);
+        img.setImageBitmap(BitmapFactory.decodeFile(filePath));
+
+        TextView title = findViewById(R.id.textView2);
+        title.setText(filePath);
+
+        Button back = findViewById(R.id.button6);
+        back.setEnabled(false);
+    }
+    public void identify_faces(View v){
+        setContentView(R.layout.activity_identify_faces);
+        ListView listView= findViewById((R.id.detected_faces_list));
+        List<identification_variables> items=new ArrayList<>();
+        for(int i=0;i<croppedFaces.size();i++){
+            items.add(new identification_variables(croppedFaces.get(i), names.get(i)));
+        }
+        identify_face_adapter adapter =new identify_face_adapter(this,R.layout.face_identification,items);
+        listView.setAdapter(adapter);
+    }
+    public void onSaveClick(View v){
+        ListView listView = findViewById(R.id.detected_faces_list);
+        identify_face_adapter adapter = (identify_face_adapter) listView.getAdapter();
+
+        for (int i = 0; i < adapter.getCount(); i++) {
+            View item = listView.getChildAt(i);
+            if (item != null) {
+                EditText editText = item.findViewById(R.id.name);
+                String text = editText.getText().toString();
+                if(!(text.equals(names.get(i)))){
+                    final int index=i;
+                    executorService.submit(()-> {
+                        User user = db.userDao().findByUID(userIDs.get(index));
+                        user.name=text;
+                        db.userDao().updateUser(user);
+                    });
+                }
+            }
+        }
+        Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
+        onResume();
+    }
     public void shareImage(View v) {
         File file = new File(filePath);
         Uri uri = FileProvider.getUriForFile(this, getApplicationContext().getPackageName() + ".provider", file);
@@ -133,11 +198,9 @@ public class image_view extends AppCompatActivity {
     }
 
 
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
-//        The ExecutorService shutdown in the onDestroy method ensures that:
-//        No new tasks will be accepted after the activity is destroyed.
-//        Currently running tasks are allowed to complete.
     }
 }

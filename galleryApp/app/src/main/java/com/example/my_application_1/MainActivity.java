@@ -6,6 +6,7 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
@@ -25,6 +26,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.GridView;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.Toast;
 
@@ -39,10 +41,12 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class MainActivity extends AppCompatActivity implements GalleryAdapter.OnImageClickListener {
+public class MainActivity extends AppCompatActivity implements GalleryAdapter.OnImageClickListener, GalleryAdapter.OnImageLongClickListener {
 
     private GridView galleryListView;
     private GalleryAdapter galleryAdapter;
+    public boolean stateSelection = false;
+    public Set<String> selected = new HashSet<>();
     private List<String> imagePaths;
     public ArrayList<Rect>rects;
     private ArrayList<Bitmap> croppedFaces;
@@ -81,7 +85,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         galleryListView = findViewById(R.id.gallery);
         imagePaths = loadImagesFromGallery();
 
-        galleryAdapter = new GalleryAdapter(this, imagePaths, this);
+        galleryAdapter = new GalleryAdapter(this, imagePaths);
         galleryListView.setAdapter(galleryAdapter);
         Log.d("MainActivity", "Starting background thread");
         Thread workThread = new Thread() {
@@ -90,9 +94,6 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 try {
                     Log.d("MainActivity", "Background thread started");
                     List<User> userList = db.userDao().getAll();
-                    if(userList.size()>0){
-                        fkey=userList.get(userList.size()-1).fkey+1;
-                    }
                     Log.d("MainActivity", "UserList size= " + userList.size());
 
                     processData();
@@ -117,14 +118,46 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             }
         }
     }
-
     @Override
-    public void onImageClick(String imagePath) {
+    public void onImageClick(String imagePath, ImageView imV) {
+        if(stateSelection){
+            if(selected.contains(imagePath)){
+                selected.remove(imagePath);
+                imV.setBackgroundColor(Color.TRANSPARENT);
+                imV.setColorFilter(null);
+                if(selected.isEmpty()){
+                    stateSelection = false;
+                }
+            }else{
+                selected.add(imagePath);
+                imV.setBackgroundColor(Color.parseColor("#AA0000FF"));
+                imV.setColorFilter(Color.argb(150,0,0,0));
+            }
+            return;
+        }
         Toast.makeText(this, "Clicked on image: " + imagePath, Toast.LENGTH_SHORT).show();
 
         Intent openPhoto = new Intent(this, image_view.class);
         openPhoto.putExtra("filePath", imagePath);
         startActivity(openPhoto);
+    }
+    @Override
+    public boolean onImageLongClick(String imagePath, ImageView imV) {
+        Log.d("samsung", "long clicked "+imagePath);
+        stateSelection = true;
+        if(selected.contains(imagePath)){
+            selected.remove(imagePath);
+            imV.setBackgroundColor(Color.TRANSPARENT);
+            imV.setColorFilter(null);
+            if(selected.isEmpty()){
+                stateSelection = false;
+            }
+        }else{
+            selected.add(imagePath);
+            imV.setBackgroundColor(Color.parseColor("#AA0000FF"));
+            imV.setColorFilter(Color.argb(150,0,0,0));
+        }
+        return true;
     }
 
     private List<String> loadImagesFromGallery() {
@@ -155,12 +188,6 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             if(fileSet.contains(filePath)) {
                 count++;
 //                Log.d("Image count",""+count);
-                if(ptr==allFilesSize){
-                    db.userDao().updateAllUser(usersToUpdate);
-                    db.userDao().insertAll(usersToInsert);
-                    db.faceDao().insertAll(facesToInsert);
-                    Log.d("processData","Database updated");
-                }
             }
             else{
                 faceDetection(filePath,ptr);
@@ -233,13 +260,13 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             if (similarity(em,cur_em)>=threshold){
                 user.embeddings=meanEmbeddings(em, cur_em, user.n);
                 user.n=user.n+1;
-                Face face =new Face(cur_em,filePath,user.fkey);
+                Face face =new Face(cur_em,filePath,i+1);
                 userList.set(i,user);
-                usersToUpdate.add(user);
-//                db.userDao().updateUser(user);
+//                usersToUpdate.add(user);
+                db.userDao().updateUser(user);
 //                Log.d("Main Activity","User updated");
-                facesToInsert.add(face);
-//                db.faceDao().insert(face);
+//                facesToInsert.add(face);
+                db.faceDao().insert(face);
 //                Log.d("Main Activity","Face Inserted");
                 flag=true;
                 break;
@@ -247,28 +274,18 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         }
         if(!flag){
             // prompt user to enter name
-            User user= new User("Unknown", 1, cur_em,fkey++);
-            Face face =new Face(cur_em,filePath,user.fkey);
+            User user= new User("Unknown", 1, cur_em);
             userList.add(user);
-//            db.userDao().insert(user);
-            usersToInsert.add(user);
+            Face face =new Face(cur_em,filePath,userList.size());
+            db.userDao().insert(user);
+//            usersToInsert.add(user);
 //            Log.d("Main Activity","User Inserted");
-            facesToInsert.add(face);
-//            db.faceDao().insert(face);
+//            facesToInsert.add(face);
+            db.faceDao().insert(face);
 //            Log.d("Main Activity","Face Inserted");
         }
         if(ptr==allFilesSize){
-            try{
-            db.userDao().updateAllUser(usersToUpdate);
-            db.userDao().insertAll(usersToInsert);
-            db.faceDao().insertAll(facesToInsert);
-            usersToUpdate.clear();
-            usersToInsert.clear();
-            facesToInsert.clear();
-            Log.d("checkUser","Database updated");}
-            catch (Exception e){
-                Log.e("usersCheck","Error",e);
-            }
+            Log.d("checkUsers","Done");
         }
     }
     private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
@@ -300,5 +317,4 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         //        No new tasks will be accepted after the activity is destroyed.
         //        Currently running tasks are allowed to complete.
     }
-
 }
