@@ -1,5 +1,7 @@
 package com.example.my_application_1;
 
+import static java.sql.Types.NULL;
+
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -119,8 +121,8 @@ public class image_view extends AppCompatActivity {
             if (item != null) {
                 EditText editText = item.findViewById(R.id.name);
                 String text = editText.getText().toString();
-                if(!(text.equals(names.get(i)))){
-                    final int index=i;
+                final int index=i;
+                if((!(text.equals(names.get(i))) && (text.length()!=0))){
                     executorService.submit(()-> {
                         User user = db.userDao().findByUID(userIDs.get(index));
                         user.name=text;

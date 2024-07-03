@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 
 import androidx.activity.EdgeToEdge;
@@ -35,6 +36,9 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -46,6 +50,8 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     private GridView galleryListView;
     private GalleryAdapter galleryAdapter;
     public boolean stateSelection = false;
+    public Button share;
+
     public Set<String> selected = new HashSet<>();
     private List<String> imagePaths;
     public ArrayList<Rect>rects;
@@ -56,10 +62,6 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     private AppDatabase db;
     private ExecutorService userExecutiveService;
     int allFilesSize;
-    List<Face> facesToInsert= new ArrayList<>();
-    List<User> usersToUpdate= new ArrayList<>();
-    List<User> usersToInsert= new ArrayList<>();
-    int fkey=0;
 
     private static final int REQUEST_CODE_PERMISSIONS = 100;
 
@@ -73,15 +75,20 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-
-
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_CODE_PERMISSIONS);
-        }
+        share = findViewById(R.id.share);
+        share.setVisibility(View.INVISIBLE);
 
         db = AppDatabase.getInstance(getApplicationContext());
         userExecutiveService = Executors.newSingleThreadExecutor();
 
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_CODE_PERMISSIONS);
+        }
+        else{
+            initializeApp();
+        }
+    }
+    public void initializeApp(){
         galleryListView = findViewById(R.id.gallery);
         imagePaths = loadImagesFromGallery();
 
@@ -112,9 +119,10 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Permission granted", Toast.LENGTH_SHORT).show();
+                initializeApp();
             } else {
                 Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show();
-                ((Button)findViewById(R.id.shareButton)).setEnabled(false);
+                onDestroy();
             }
         }
     }
@@ -127,6 +135,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 imV.setColorFilter(null);
                 if(selected.isEmpty()){
                     stateSelection = false;
+                    share.setVisibility(View.INVISIBLE);
                 }
             }else{
                 selected.add(imagePath);
@@ -135,7 +144,6 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             }
             return;
         }
-        Toast.makeText(this, "Clicked on image: " + imagePath, Toast.LENGTH_SHORT).show();
 
         Intent openPhoto = new Intent(this, image_view.class);
         openPhoto.putExtra("filePath", imagePath);
@@ -143,14 +151,15 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     }
     @Override
     public boolean onImageLongClick(String imagePath, ImageView imV) {
-        Log.d("samsung", "long clicked "+imagePath);
         stateSelection = true;
+        share.setVisibility(View.VISIBLE);
         if(selected.contains(imagePath)){
             selected.remove(imagePath);
             imV.setBackgroundColor(Color.TRANSPARENT);
             imV.setColorFilter(null);
             if(selected.isEmpty()){
                 stateSelection = false;
+                share.setVisibility(View.INVISIBLE);
             }
         }else{
             selected.add(imagePath);
@@ -160,6 +169,77 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         return true;
     }
 
+
+    public void shareGroup(View v){
+        //share a bunch of images
+        List<String> selectedFiles = new ArrayList<>();
+        selectedFiles.addAll(selected);
+        AsyncTask.execute(()->{
+            List<Integer> ids = db.faceDao().getAllUsers(selectedFiles);
+            HashMap<Integer, Integer> freq = new HashMap<>();
+            for(int i : ids){
+                if(freq.containsKey(i)){
+                    freq.put(i, freq.get(i)+1);
+                }else{
+                    freq.put(i, 1);
+                }
+            }
+            Collections.sort(ids, new Comparator<Integer>() {
+                public int compare(Integer n1, Integer n2){
+                    int freq1 = freq.get(n1);
+                    int freq2 = freq.get(n2);
+                    if (freq1 != freq2) {
+                        return freq2 - freq1;
+                    }else {
+                        return (n1 - n2);
+                    }
+                }
+            });
+            List<User> suggestions = new ArrayList<>();
+            for(int i =0 ; i< ids.size() ; i++){
+                if(i>0 && ids.get(i)==ids.get(i-1)) continue;
+                User temp = db.userDao().findByUID(ids.get(i));
+                if((!suggestions.contains(temp)) && (!temp.name.equals("Unknown")) && (temp.name.length()!=0)){
+                    suggestions.add(temp);
+                }
+            }
+
+            try {
+                runOnUiThread(() -> {
+                            setContentView(R.layout.share_screen);
+                            ListView shareListView = findViewById(R.id.listView);
+                            SuggestionsAdapter suggestionsAdapter = new SuggestionsAdapter(this, R.layout.share_item, suggestions);
+                            shareListView.setAdapter(suggestionsAdapter);
+                        }
+                );
+            }catch (Exception e){
+                Log.e("shareGroup", "error",e);
+            }
+
+        });
+
+    }
+
+    public void okShare(View v){
+        selected.clear();
+        setContentView(R.layout.activity_main);
+        galleryListView = findViewById(R.id.gallery);
+        galleryAdapter = new GalleryAdapter(this, imagePaths);
+        galleryListView.setAdapter(galleryAdapter);
+        share = findViewById(R.id.share);
+        share.setVisibility(View.INVISIBLE);
+        stateSelection = false;
+    }
+    public void cancelShare(View v){
+        selected.clear();
+        setContentView(R.layout.activity_main);
+        galleryListView = findViewById(R.id.gallery);
+        galleryAdapter = new GalleryAdapter(this, imagePaths);
+        galleryListView.setAdapter(galleryAdapter);
+        share = findViewById(R.id.share);
+        share.setVisibility(View.INVISIBLE);
+        stateSelection = false;
+    }
     private List<String> loadImagesFromGallery() {
         List<String> imagePaths = new ArrayList<>();
         Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
@@ -182,29 +262,24 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         List<String> allFiles= db.faceDao().loadAllFiles();
         fileSet.addAll(allFiles);
         int count=0;
-        int ptr=0;
         for(String filePath: imagePaths){
-            ptr++;
             if(fileSet.contains(filePath)) {
                 count++;
-//                Log.d("Image count",""+count);
             }
             else{
-                faceDetection(filePath,ptr);
+                faceDetection(filePath);
             }
         }
         Log.d("Total new files",""+(allFilesSize-count));
     }
-    protected void faceDetection(String filePath,int ptr){
+    protected void faceDetection(String filePath){
         FaceDetectionCallback callback= new FaceDetectionCallback() {
             @Override
             public void onFacesDetected(ArrayList<Rect> faces) {
                 userExecutiveService.submit(() -> {
-//                    Log.d("Task","Task started");
                     rects = faces;
                     crop_faces(filePath);
-                    extractEmbeddings(filePath,ptr);
-//                    Log.d("Task","Task completed");
+                    extractEmbeddings(filePath);
                 });
             }
 
@@ -234,24 +309,23 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             }
         }
     }
-    protected void extractEmbeddings(String filePath,int ptr){
+    protected void extractEmbeddings(String filePath){
         try {
             FaceNetEmbeddings faceNetEmbeddings = new FaceNetEmbeddings(this,"facenet.tflite");
             embeddings = faceNetEmbeddings.getEmbeddings(croppedFaces);
-//            Log.d("Embeddings status:", "Generated");
-            updateData(filePath,ptr);
+            updateData(filePath);
         }
         catch(IOException e){
             e.printStackTrace();
         }
     }
 
-    protected void updateData(String filePath,int ptr){
+    protected void updateData(String filePath){
         for(float[] em:embeddings){
-            checkUsers(em,filePath,ptr);
+            checkUsers(em,filePath);
         }
     }
-    private void checkUsers(float[] cur_em,String filePath,int ptr){
+    private void checkUsers(float[] cur_em,String filePath){
         boolean flag = false;
         float threshold=0.63f;
         for(int i=0;i<userList.size();i++){
@@ -262,30 +336,19 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 user.n=user.n+1;
                 Face face =new Face(cur_em,filePath,i+1);
                 userList.set(i,user);
-//                usersToUpdate.add(user);
                 db.userDao().updateUser(user);
-//                Log.d("Main Activity","User updated");
-//                facesToInsert.add(face);
                 db.faceDao().insert(face);
-//                Log.d("Main Activity","Face Inserted");
                 flag=true;
                 break;
             }
         }
         if(!flag){
-            // prompt user to enter name
             User user= new User("Unknown", 1, cur_em);
+            user.uid=userList.size()+1;
             userList.add(user);
             Face face =new Face(cur_em,filePath,userList.size());
             db.userDao().insert(user);
-//            usersToInsert.add(user);
-//            Log.d("Main Activity","User Inserted");
-//            facesToInsert.add(face);
             db.faceDao().insert(face);
-//            Log.d("Main Activity","Face Inserted");
-        }
-        if(ptr==allFilesSize){
-            Log.d("checkUsers","Done");
         }
     }
     private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
@@ -313,8 +376,5 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     protected void onDestroy() {
         super.onDestroy();
         userExecutiveService.shutdown();
-        //        The ExecutorService shutdown in the onDestroy method ensures that:
-        //        No new tasks will be accepted after the activity is destroyed.
-        //        Currently running tasks are allowed to complete.
     }
 }
