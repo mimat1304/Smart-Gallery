@@ -1,11 +1,14 @@
 package com.example.my_application_1;
 
+import static java.lang.Double.min;
 import static java.sql.Types.NULL;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.graphics.Rect;
+import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -25,6 +28,8 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.bumptech.glide.Glide;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,16 +40,16 @@ import java.util.concurrent.Executors;
 
 
 public class image_view extends AppCompatActivity {
-
-
+    Bitmap bitmap = null;
+    Bitmap bitmapToShow = null;
     public String filePath;
-    public ArrayList<Rect>rects;
-    private ArrayList<Bitmap> croppedFaces;
+    public ArrayList<Rect>rects= new ArrayList<>();
+    private ArrayList<Bitmap> croppedFaces= new ArrayList<>();
     private float[][] embeddings;
 
     AppDatabase db;
     ExecutorService executorService;
-    List<Integer>userIDs;
+    List<Integer>userIDs=new ArrayList<>();
     List<String>names= new ArrayList<>();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,16 +65,16 @@ public class image_view extends AppCompatActivity {
         executorService=Executors.newSingleThreadExecutor();
         Intent intent = getIntent();
         filePath = intent.getStringExtra("filePath");
+        ImageView imageView = findViewById(R.id.imageView);
+        Bitmap img= BitmapFactory.decodeFile(filePath);
+        try {
+            bitmap = rotateImageIfRequired(img, filePath);
+            bitmapToShow=handleSamplingAndRotationBitmap(filePath);
 
-        ImageView img = findViewById(R.id.imageView);
-        img.setImageBitmap(BitmapFactory.decodeFile(filePath));
-
-        TextView title = findViewById(R.id.textView2);
-        title.setText(filePath);
-
-        Button back = findViewById(R.id.button6);
-        back.setEnabled(false);
-
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        imageView.setImageBitmap(bitmapToShow);
         faceDetection();
 
         try {
@@ -84,6 +89,61 @@ public class image_view extends AppCompatActivity {
             Log.e("image view","Error",e);
         }
     }
+    public static Bitmap handleSamplingAndRotationBitmap(String imagePath) throws IOException {
+        // First decode with inJustDecodeBounds=true to check dimensions
+        final BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(imagePath, options);
+
+        options.inSampleSize = calculateInSampleSize(options, 1024, 1024);
+
+        options.inJustDecodeBounds = false;
+        Bitmap img = BitmapFactory.decodeFile(imagePath, options);
+
+        return rotateImageIfRequired(img, imagePath);
+    }
+    private static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+
+        if (height > reqHeight || width > reqWidth) {
+            final int halfHeight = height / 2;
+            final int halfWidth = width / 2;
+
+            // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+            // height and width larger than the requested height and width.
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2;
+            }
+        }
+
+        return inSampleSize;
+    }
+
+    private static Bitmap rotateImageIfRequired(Bitmap img, String imagePath) throws IOException {
+        ExifInterface ei = new ExifInterface(imagePath);
+        int orientation = ei.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+
+        switch (orientation) {
+            case ExifInterface.ORIENTATION_ROTATE_90:
+                return rotateImage(img, 90);
+            case ExifInterface.ORIENTATION_ROTATE_180:
+                return rotateImage(img, 180);
+            case ExifInterface.ORIENTATION_ROTATE_270:
+                return rotateImage(img, 270);
+            default:
+                return img;
+        }
+    }
+
+    private static Bitmap rotateImage(Bitmap img, int degree) {
+        Matrix matrix = new Matrix();
+        matrix.postRotate(degree);
+        Bitmap rotatedImg = Bitmap.createBitmap(img, 0, 0, img.getWidth(), img.getHeight(), matrix, true);
+        img.recycle();
+        return rotatedImg;
+    }
     @Override
     protected void onResume() {
         super.onResume();
@@ -93,20 +153,14 @@ public class image_view extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-        ImageView img = findViewById(R.id.imageView);
-        img.setImageBitmap(BitmapFactory.decodeFile(filePath));
-
-        TextView title = findViewById(R.id.textView2);
-        title.setText(filePath);
-
-        Button back = findViewById(R.id.button6);
-        back.setEnabled(false);
+        ImageView imageView = findViewById(R.id.imageView);
+        imageView.setImageBitmap(bitmapToShow);
     }
     public void identify_faces(View v){
         setContentView(R.layout.activity_identify_faces);
         ListView listView= findViewById((R.id.detected_faces_list));
         List<identification_variables> items=new ArrayList<>();
-        for(int i=0;i<croppedFaces.size();i++){
+        for(int i=0;i<min(croppedFaces.size(),names.size());i++){
             items.add(new identification_variables(croppedFaces.get(i), names.get(i)));
         }
         identify_face_adapter adapter =new identify_face_adapter(this,R.layout.face_identification,items);
@@ -159,23 +213,32 @@ public class image_view extends AppCompatActivity {
 
             }
         };
-        File file = new File(filePath);
-        Uri uri = FileProvider.getUriForFile(this, getApplicationContext().getPackageName() + ".provider", file);
         FaceDetection_Activity faceDetectionActivity= new FaceDetection_Activity();
-        faceDetectionActivity.processImage(this,uri);
+        faceDetectionActivity.processImage(this,filePath);
         faceDetectionActivity.detectFaces(callback);
 
     }
 
     protected void crop_faces(ArrayList<Rect>rects) {
-        Bitmap image = BitmapFactory.decodeFile(filePath);
-        croppedFaces = new ArrayList<>();
+        Bitmap image = bitmap;
 
-        // Crop each face and add to the list
+        croppedFaces = new ArrayList<>();
         for (Rect faceRect : rects) {
-            Bitmap face = Bitmap.createBitmap(image, faceRect.left, faceRect.top,
-                    faceRect.width(), faceRect.height());
-            croppedFaces.add(face);
+            int left = Math.max(0, faceRect.left);
+            int top = Math.max(0, faceRect.top);
+            int right = Math.min(image.getWidth(), faceRect.right);
+            int bottom = Math.min(image.getHeight(), faceRect.bottom);
+
+            int width = right - left;
+            int height = bottom - top;
+
+            if (width > 0 && height > 0) {
+                Bitmap face = Bitmap.createBitmap(image, left, top, width, height);
+                croppedFaces.add(face);
+            } else {
+                Log.w("FaceDetection", "Invalid faceRect: " + faceRect.toString());
+            }
+
         }
     }
     protected void extractEmbeddings(){

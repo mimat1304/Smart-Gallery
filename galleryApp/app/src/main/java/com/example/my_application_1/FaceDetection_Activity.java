@@ -1,7 +1,10 @@
 package com.example.my_application_1;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Rect;
+import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.content.Context;
@@ -29,18 +32,32 @@ import java.util.List;
 
 public class FaceDetection_Activity{
     InputImage image;
-    protected void processImage(Context context,Uri uri){
+    protected void processImage(Context context,String filePath){
         if (context == null) {
             throw new IllegalArgumentException("Context cannot be null");
         }
 
-        if (uri == null) {
-            throw new IllegalArgumentException("Uri cannot be null");
-        }
         try {
-            image = InputImage.fromFilePath(context, uri);
+            Bitmap bitmap = BitmapFactory.decodeFile(filePath);
+            int rotationAngle=getRotationAngle(filePath);
+            image = InputImage.fromBitmap(bitmap, rotationAngle);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+    protected int getRotationAngle(String imagePath) throws IOException {
+        ExifInterface ei = new ExifInterface(imagePath);
+        int orientation = ei.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+
+        switch (orientation) {
+            case ExifInterface.ORIENTATION_ROTATE_90:
+                return 90;
+            case ExifInterface.ORIENTATION_ROTATE_180:
+                return 180;
+            case ExifInterface.ORIENTATION_ROTATE_270:
+                return 270;
+            default:
+                return 0;
         }
     }
     protected void detectFaces(FaceDetectionCallback callback){

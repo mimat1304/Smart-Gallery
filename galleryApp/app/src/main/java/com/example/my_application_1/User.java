@@ -7,9 +7,8 @@ import androidx.room.TypeConverters;
 
 @Entity(tableName = "User")
 public class User {
-    @PrimaryKey(autoGenerate = true)
+    @PrimaryKey
     public int uid;
-
     @ColumnInfo(name = "Number of images")
     public int n;
 

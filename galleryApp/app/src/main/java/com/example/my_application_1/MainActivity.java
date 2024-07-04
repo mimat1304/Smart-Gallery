@@ -10,6 +10,7 @@ import android.graphics.Color;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.activity.EdgeToEdge;
@@ -63,7 +64,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     private ExecutorService userExecutiveService;
     int allFilesSize;
 
-    private static final int REQUEST_CODE_PERMISSIONS = 100;
+    private static final int PERMISSION_REQUEST_CODE = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,11 +82,37 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         db = AppDatabase.getInstance(getApplicationContext());
         userExecutiveService = Executors.newSingleThreadExecutor();
 
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_CODE_PERMISSIONS);
-        }
-        else{
-            initializeApp();
+        requestPermissions();
+
+    }
+    private void requestPermissions(){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13 (API level 33) and above
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.READ_MEDIA_IMAGES}, PERMISSION_REQUEST_CODE);
+            } else {
+                initializeApp();
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10 (API level 29) to Android 12 (API level 32)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
+            } else {
+                initializeApp();
+            }
+        } else {
+            // Android 9 (API level 28) and below
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
+            } else {
+                initializeApp();
+            }
         }
     }
     public void initializeApp(){
@@ -116,7 +143,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_CODE_PERMISSIONS) {
+        if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Permission granted", Toast.LENGTH_SHORT).show();
                 initializeApp();
@@ -254,6 +281,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             cursor.close();
         }
         allFilesSize=imagePaths.size();
+        Collections.reverse(imagePaths);
         return imagePaths;
     }
 
@@ -288,27 +316,33 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
 
             }
         };
-        File file = new File(filePath);
-        Uri uri = FileProvider.getUriForFile(this, getApplicationContext().getPackageName() + ".provider", file);
         FaceDetection_Activity faceDetectionActivity= new FaceDetection_Activity();
-        faceDetectionActivity.processImage(this,uri);
+        faceDetectionActivity.processImage(this,filePath);
         faceDetectionActivity.detectFaces(callback);
     }
     protected void crop_faces(String filePath) {
         Bitmap image = BitmapFactory.decodeFile(filePath);
         croppedFaces = new ArrayList<>();
 
-        // Crop each face and add to the list
         for (Rect faceRect : rects) {
-            try{
-            Bitmap face = Bitmap.createBitmap(image, faceRect.left, faceRect.top,
-                    faceRect.width(), faceRect.height());
-            croppedFaces.add(face);}
-            catch(Exception e){
+            int left = Math.max(0, faceRect.left);
+            int top = Math.max(0, faceRect.top);
+            int right = Math.min(image.getWidth(), faceRect.right);
+            int bottom = Math.min(image.getHeight(), faceRect.bottom);
 
+            int width = right - left;
+            int height = bottom - top;
+
+            if (width > 0 && height > 0) {
+                Bitmap face = Bitmap.createBitmap(image, left, top, width, height);
+                croppedFaces.add(face);
+            } else {
+                Log.w("FaceDetection", "Invalid faceRect: " + faceRect.toString());
             }
+
         }
     }
+
     protected void extractEmbeddings(String filePath){
         try {
             FaceNetEmbeddings faceNetEmbeddings = new FaceNetEmbeddings(this,"facenet.tflite");
@@ -343,12 +377,16 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             }
         }
         if(!flag){
-            User user= new User("Unknown", 1, cur_em);
-            user.uid=userList.size()+1;
-            userList.add(user);
-            Face face =new Face(cur_em,filePath,userList.size());
-            db.userDao().insert(user);
-            db.faceDao().insert(face);
+            try {
+                User user = new User("Unknown", 1, cur_em);
+                user.uid = userList.size() + 1;
+                userList.add(user);
+                Face face = new Face(cur_em, filePath, userList.size());
+                db.userDao().insert(user);
+                db.faceDao().insert(face);
+            }catch (Exception e){
+                Log.e("!flag","error",e);
+            }
         }
     }
     private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
@@ -359,18 +397,26 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         return meanEM;
     }
     private float similarity(float[] em1, float[] em2){
-        float dotProduct = 0.0f;
-        for (int i = 0; i < em1.length; i++) {
-            dotProduct += em1[i] * em2[i];
+        float ans=0;
+        try{
+            float dotProduct = 0.0f;
+            for (int i = 0; i < em1.length; i++) {
+                dotProduct += em1[i] * em2[i];
+            }
+            float magnitude1 = 0.0f, magnitude2 = 0.0f;
+            for (int i = 0; i < em1.length; i++) {
+                magnitude1 += (em1[i] * em1[i]);
+                magnitude2 += (em2[i] * em2[i]);
+            }
+            magnitude1 = (float) Math.sqrt(magnitude1);
+            magnitude2 = (float) Math.sqrt(magnitude2);
+            ans=dotProduct / (magnitude1 * magnitude2);
+
+        }catch (Exception e){
+            Log.e("Similarity","error",e);
+
         }
-        float magnitude1=0.0f,magnitude2=0.0f;
-        for (int i=0;i< em1.length;i++){
-            magnitude1+=(em1[i]*em1[i]);
-            magnitude2+=(em2[i]*em2[i]);
-        }
-        magnitude1 = (float) Math.sqrt(magnitude1);
-        magnitude2 = (float) Math.sqrt(magnitude2);
-        return dotProduct/(magnitude1*magnitude2);
+        return ans;
     }
     @Override
     protected void onDestroy() {

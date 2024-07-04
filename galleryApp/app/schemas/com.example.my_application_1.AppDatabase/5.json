@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "e856e92597f662d983765f54f3252e53",
+    "identityHash": "a7e809f304eb51528780d512d9b242c5",
     "entities": [
       {
         "tableName": "User",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uid` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `Number of images` INTEGER NOT NULL, `Name` TEXT, `embeddings` BLOB)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uid` INTEGER NOT NULL, `Number of images` INTEGER NOT NULL, `Name` TEXT, `embeddings` BLOB, PRIMARY KEY(`uid`))",
         "fields": [
           {
             "fieldPath": "uid",
@@ -34,7 +34,7 @@
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
+          "autoGenerate": false,
           "columnNames": [
             "uid"
           ]
@@ -106,7 +106,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e856e92597f662d983765f54f3252e53')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a7e809f304eb51528780d512d9b242c5')"
     ]
   }
 }

@@ -1,6 +1,9 @@
 package com.example.my_application_1;
 
 import android.content.Context;
+import android.graphics.BitmapFactory;
+import android.media.ExifInterface;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -8,7 +11,11 @@ import android.widget.BaseAdapter;
 import android.widget.ImageView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.resource.bitmap.Rotate;
+import com.bumptech.glide.request.RequestOptions;
+import com.bumptech.glide.request.target.Target;
 
+import java.io.IOException;
 import java.util.List;
 
 public class GalleryAdapter extends BaseAdapter {
@@ -58,13 +65,30 @@ public class GalleryAdapter extends BaseAdapter {
 
         ImageView imageView = convertView.findViewById(R.id.imageView);
         String imagePath = imagePaths.get(position);
+        ExifInterface exif = null;
+        try {
+            exif = new ExifInterface(imagePath);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+
+        int rotationAngle = 0;
+        if (orientation == ExifInterface.ORIENTATION_ROTATE_90) {
+            rotationAngle = 90;
+        } else if (orientation == ExifInterface.ORIENTATION_ROTATE_180) {
+            rotationAngle = 180;
+        } else if (orientation == ExifInterface.ORIENTATION_ROTATE_270) {
+            rotationAngle = 270;
+        }
         Glide.with(context)
                 .load(imagePath)
                 .into(imageView);
 
+        Log.d("gallery adapter",""+rotationAngle);
         imageView.setOnClickListener(v -> onImageClickListener.onImageClick(imagePath, imageView));
-//        imageView.setOnClickListener(v -> onImageClickListener.onImageClick(imagePath));
         imageView.setOnLongClickListener(v -> onImageLongClickListener.onImageLongClick(imagePath, imageView));
+        imageView.setRotation(rotationAngle);
         return convertView;
     }
 }
