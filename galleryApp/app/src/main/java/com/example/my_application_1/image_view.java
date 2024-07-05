@@ -1,8 +1,7 @@
 package com.example.my_application_1;
 
 import static java.lang.Double.min;
-import static java.sql.Types.NULL;
-
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -10,15 +9,12 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.media.ExifInterface;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -27,8 +23,6 @@ import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
-
-import com.bumptech.glide.Glide;
 
 import java.io.File;
 import java.io.IOException;
@@ -78,12 +72,7 @@ public class image_view extends AppCompatActivity {
         faceDetection();
 
         try {
-            executorService.submit(() -> {
-                userIDs = db.faceDao().getAllUsers(filePath);
-                for (int userID : userIDs) {
-                    names.add((db.userDao().findByUID(userID)).name);
-                }
-            });
+
         }
         catch(Exception e){
             Log.e("image view","Error",e);
@@ -157,14 +146,31 @@ public class image_view extends AppCompatActivity {
         imageView.setImageBitmap(bitmapToShow);
     }
     public void identify_faces(View v){
-        setContentView(R.layout.activity_identify_faces);
-        ListView listView= findViewById((R.id.detected_faces_list));
-        List<identification_variables> items=new ArrayList<>();
-        for(int i=0;i<min(croppedFaces.size(),names.size());i++){
-            items.add(new identification_variables(croppedFaces.get(i), names.get(i)));
+        if(croppedFaces.size()==0){
+            Toast.makeText(this, "No faces detected", Toast.LENGTH_SHORT).show();
+            return;
         }
-        identify_face_adapter adapter =new identify_face_adapter(this,R.layout.face_identification,items);
-        listView.setAdapter(adapter);
+        setContentView(R.layout.activity_identify_faces);
+        Context context=this;
+        executorService.submit(() -> {
+            userIDs = db.faceDao().getAllUsers(filePath);
+            for (int userID : userIDs) {
+                names.add((db.userDao().findByUID(userID)).name);
+            }
+            ListView listView= findViewById((R.id.detected_faces_list));
+            List<identification_variables> items=new ArrayList<>();
+            for(int i=0;i<min(croppedFaces.size(),names.size());i++){
+                items.add(new identification_variables(croppedFaces.get(i), names.get(i)));
+            }
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    identify_face_adapter adapter = new identify_face_adapter(context, R.layout.face_identification, items);
+                    listView.setAdapter(adapter);
+                }
+            });
+        });
     }
     public void onSaveClick(View v){
         ListView listView = findViewById(R.id.detected_faces_list);

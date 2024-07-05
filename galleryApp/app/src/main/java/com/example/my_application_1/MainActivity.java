@@ -127,7 +127,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             public void run() {
                 try {
                     Log.d("MainActivity", "Background thread started");
-                    List<User> userList = db.userDao().getAll();
+                    userList = db.userDao().getAll();
                     Log.d("MainActivity", "UserList size= " + userList.size());
 
                     processData();
@@ -380,6 +380,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             try {
                 User user = new User("Unknown", 1, cur_em);
                 user.uid = userList.size() + 1;
+
                 userList.add(user);
                 Face face = new Face(cur_em, filePath, userList.size());
                 db.userDao().insert(user);

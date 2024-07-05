@@ -65,30 +65,28 @@ public class GalleryAdapter extends BaseAdapter {
 
         ImageView imageView = convertView.findViewById(R.id.imageView);
         String imagePath = imagePaths.get(position);
-        ExifInterface exif = null;
-        try {
-            exif = new ExifInterface(imagePath);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-
-        int rotationAngle = 0;
-        if (orientation == ExifInterface.ORIENTATION_ROTATE_90) {
-            rotationAngle = 90;
-        } else if (orientation == ExifInterface.ORIENTATION_ROTATE_180) {
-            rotationAngle = 180;
-        } else if (orientation == ExifInterface.ORIENTATION_ROTATE_270) {
-            rotationAngle = 270;
-        }
+//        ExifInterface exif = null;
+//        try {
+//            exif = new ExifInterface(imagePath);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
+//        int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+//
+//        int rotationAngle = 0;
+//        if (orientation == ExifInterface.ORIENTATION_ROTATE_90) {
+//            rotationAngle = 90;
+//        } else if (orientation == ExifInterface.ORIENTATION_ROTATE_180) {
+//            rotationAngle = 180;
+//        } else if (orientation == ExifInterface.ORIENTATION_ROTATE_270) {
+//            rotationAngle = 270;
+//        }
         Glide.with(context)
                 .load(imagePath)
                 .into(imageView);
-
-        Log.d("gallery adapter",""+rotationAngle);
         imageView.setOnClickListener(v -> onImageClickListener.onImageClick(imagePath, imageView));
         imageView.setOnLongClickListener(v -> onImageLongClickListener.onImageLongClick(imagePath, imageView));
-        imageView.setRotation(rotationAngle);
+//        imageView.setRotation(rotationAngle);
         return convertView;
     }
 }
