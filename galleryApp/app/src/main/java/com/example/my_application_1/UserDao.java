@@ -16,7 +16,10 @@ public interface UserDao {
     List<User> loadAllByIds(int[] userIds);
     @Query("SELECT * FROM User WHERE uid IN (:userIds)")
     List<User> loadAllByIds(List<Integer> userIds);
-
+    @Query("SELECT COUNT(*) FROM User")
+    int getUserListSize();
+    @Query("SELECT * FROM User WHERE name = :name LIMIT 1")
+    User findByName(String name);
     @Query("SELECT * FROM User WHERE uid = :uid")
     User findByUID(int uid);
 

@@ -6,7 +6,10 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -303,10 +306,10 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     protected void faceDetection(String filePath){
         FaceDetectionCallback callback= new FaceDetectionCallback() {
             @Override
-            public void onFacesDetected(ArrayList<Rect> faces) {
+            public void onFacesDetected(ArrayList<Rect> faces, List<Float>rollAngles) {
                 userExecutiveService.submit(() -> {
                     rects = faces;
-                    crop_faces(filePath);
+                    crop_faces(filePath,rollAngles);
                     extractEmbeddings(filePath);
                 });
             }
@@ -320,26 +323,29 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         faceDetectionActivity.processImage(this,filePath);
         faceDetectionActivity.detectFaces(callback);
     }
-    protected void crop_faces(String filePath) {
+    protected void crop_faces(String filePath,List<Float>rollAngles) {
         Bitmap image = BitmapFactory.decodeFile(filePath);
         croppedFaces = new ArrayList<>();
 
-        for (Rect faceRect : rects) {
+
+        for (int i=0;i<rollAngles.size();i++) {
+            float rollAngle=rollAngles.get(i);
+            Rect faceRect= rects.get(i);
+
+            Matrix matrix = new Matrix();
+            matrix.setRotate(rollAngle, faceRect.centerX(), faceRect.centerY());
+
+            Bitmap rotatedBitmap = Bitmap.createBitmap(image.getWidth(), image.getHeight(), image.getConfig());
+
+            Canvas canvas = new Canvas(rotatedBitmap);
+            canvas.drawBitmap(image, matrix, new Paint());
+
             int left = Math.max(0, faceRect.left);
             int top = Math.max(0, faceRect.top);
-            int right = Math.min(image.getWidth(), faceRect.right);
-            int bottom = Math.min(image.getHeight(), faceRect.bottom);
+            int right = Math.min(rotatedBitmap.getWidth(), faceRect.right);
+            int bottom = Math.min(rotatedBitmap.getHeight(), faceRect.bottom);
 
-            int width = right - left;
-            int height = bottom - top;
-
-            if (width > 0 && height > 0) {
-                Bitmap face = Bitmap.createBitmap(image, left, top, width, height);
-                croppedFaces.add(face);
-            } else {
-                Log.w("FaceDetection", "Invalid faceRect: " + faceRect.toString());
-            }
-
+            croppedFaces.add( Bitmap.createBitmap(rotatedBitmap, left, top, right - left, bottom - top));
         }
     }
 

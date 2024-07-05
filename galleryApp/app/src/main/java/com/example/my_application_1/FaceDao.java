@@ -4,6 +4,7 @@ import androidx.room.Dao;
 import androidx.room.Delete;
 import androidx.room.Insert;
 import androidx.room.Query;
+import androidx.room.Update;
 
 import java.util.List;
 
@@ -21,6 +22,10 @@ public interface FaceDao {
     List<Integer> getAllUsers(String filePath);
     @Query("SELECT filePath from Face")
     List<String> loadAllFiles();
+    @Query("SELECT * FROM Face WHERE uid = :uid")
+    Face getFaceFromUid(int uid);
+    @Update
+    void updateFace(Face face);
     @Query("SELECT * FROM Face WHERE filePath =:filePath")
     List<Face> loadByFilePath(String filePath);
     @Query("SELECT * FROM Face WHERE uid IN (:userIds)")

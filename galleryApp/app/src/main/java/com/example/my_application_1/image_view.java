@@ -5,7 +5,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.graphics.Rect;
 import android.media.ExifInterface;
 import android.net.Uri;
@@ -38,6 +40,7 @@ public class image_view extends AppCompatActivity {
     Bitmap bitmapToShow = null;
     public String filePath;
     public ArrayList<Rect>rects= new ArrayList<>();
+    private List<Float>rollAngles= new ArrayList<>();
     private ArrayList<Bitmap> croppedFaces= new ArrayList<>();
     private float[][] embeddings;
 
@@ -45,6 +48,7 @@ public class image_view extends AppCompatActivity {
     ExecutorService executorService;
     List<Integer>userIDs=new ArrayList<>();
     List<String>names= new ArrayList<>();
+    List<Integer> faceIds = new ArrayList<>();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -126,7 +130,7 @@ public class image_view extends AppCompatActivity {
         }
     }
 
-    private static Bitmap rotateImage(Bitmap img, int degree) {
+    private static Bitmap rotateImage(Bitmap img, float degree) {
         Matrix matrix = new Matrix();
         matrix.postRotate(degree);
         Bitmap rotatedImg = Bitmap.createBitmap(img, 0, 0, img.getWidth(), img.getHeight(), matrix, true);
@@ -194,6 +198,21 @@ public class image_view extends AppCompatActivity {
         Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         onResume();
     }
+    private float[] subMeanEmbeddings(float[] cur_em,float[] em,int n){
+        float[] meanEM= new float[em.length];
+        for (int i=0;i<em.length;i++){
+            meanEM[i]=(em[i]*n-cur_em[i])/(n-1);
+        }
+        return meanEM;
+    }
+
+    private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
+        float[] meanEM= new float[em.length];
+        for (int i=0;i<em.length;i++){
+            meanEM[i]=(em[i]*n+cur_em[i])/(n+1);
+        }
+        return meanEM;
+    }
     public void shareImage(View v) {
         File file = new File(filePath);
         Uri uri = FileProvider.getUriForFile(this, getApplicationContext().getPackageName() + ".provider", file);
@@ -208,9 +227,10 @@ public class image_view extends AppCompatActivity {
     protected void faceDetection(){
         FaceDetectionCallback callback= new FaceDetectionCallback() {
             @Override
-            public void onFacesDetected(ArrayList<Rect> faces) {
+            public void onFacesDetected(ArrayList<Rect> faces, List<Float>RollAngles) {
+                rollAngles=RollAngles;
                 rects=faces;
-                crop_faces(rects);
+                crop_faces();
                 extractEmbeddings();
             }
 
@@ -225,27 +245,32 @@ public class image_view extends AppCompatActivity {
 
     }
 
-    protected void crop_faces(ArrayList<Rect>rects) {
-        Bitmap image = bitmap;
-
+    protected void crop_faces() {
         croppedFaces = new ArrayList<>();
-        for (Rect faceRect : rects) {
+        for (int i=0;i<rollAngles.size();i++) {
+            float rollAngle=rollAngles.get(i);
+            Rect faceRect= rects.get(i);
+
+            Matrix matrix = new Matrix();
+            matrix.setRotate(rollAngle, faceRect.centerX(), faceRect.centerY());
+
+            Bitmap rotatedBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), bitmap.getConfig());
+
+            Canvas canvas = new Canvas(rotatedBitmap);
+            canvas.drawBitmap(bitmap, matrix, new Paint());
+
             int left = Math.max(0, faceRect.left);
             int top = Math.max(0, faceRect.top);
-            int right = Math.min(image.getWidth(), faceRect.right);
-            int bottom = Math.min(image.getHeight(), faceRect.bottom);
+            int right = Math.min(rotatedBitmap.getWidth(), faceRect.right);
+            int bottom = Math.min(rotatedBitmap.getHeight(), faceRect.bottom);
 
-            int width = right - left;
-            int height = bottom - top;
-
-            if (width > 0 && height > 0) {
-                Bitmap face = Bitmap.createBitmap(image, left, top, width, height);
-                croppedFaces.add(face);
-            } else {
-                Log.w("FaceDetection", "Invalid faceRect: " + faceRect.toString());
-            }
-
+            croppedFaces.add( Bitmap.createBitmap(rotatedBitmap, left, top, right - left, bottom - top));
         }
+    }
+    float[] rotatePoint(float x, float y, float centerX, float centerY, double angle) {
+        float newX = (float) ((x - centerX) * Math.cos(angle) - (y - centerY) * Math.sin(angle) + centerX);
+        float newY = (float) ((x - centerX) * Math.sin(angle) + (y - centerY) * Math.cos(angle) + centerY);
+        return new float[]{newX, newY};
     }
     protected void extractEmbeddings(){
         try {

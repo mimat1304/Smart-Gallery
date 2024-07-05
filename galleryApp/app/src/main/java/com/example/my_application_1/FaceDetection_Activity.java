@@ -71,11 +71,13 @@ public class FaceDetection_Activity{
                                     public void onSuccess(List<Face> faces) {
                                         // Task completed successfully
                                         // ...
+                                        List<Float> rollAngles= new ArrayList<>();
                                         for( Face face:faces){
                                             Rect bounds = face.getBoundingBox();
+                                            rollAngles.add(face.getHeadEulerAngleZ());
                                             rects.add(bounds);
                                         }
-                                        callback.onFacesDetected(rects);
+                                        callback.onFacesDetected(rects,rollAngles);
                                     }
                                 })
                         .addOnFailureListener(
