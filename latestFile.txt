@@ -1,0 +1,62 @@
+first go to face_identification.xml
+open code and change tag 'EditText' to 'AutoCompleteText'
+
+
+
+
+
+in identify_faces_adapter.java
+add list of strings called users
+also put it in parameter of constructor and in constructor assign this.users = users;
+the following code goes in the getView method in this file
+
+AutoCompleteTextView editText = convertView.findViewById(R.id.name);
+
+        ArrayAdapter<String> dropDown = new ArrayAdapter<>(context, android.R.layout.simple_dropdown_item_1line, users);
+        editText.setAdapter(dropDown);
+        editText.setHint(items.get(position).getName());
+
+
+
+
+
+
+
+in main activity
+in onImageClick function
+just before creating intent for image view create ArrayList of strings save user.name from all users of userList in this list and send it via intent.putStringArrayListExtra
+
+ArrayList<String> users = new ArrayList<>();
+        Log.d("samsung", "hello"+userList.size());
+        for(User user : userList){
+            if(user.name.equals("Unknown")) continue;
+            users.add(user.name);
+            Log.d("samsung", "hello "+user.name);
+        }
+        Intent openPhoto = new Intent(this, image_view.class);
+        openPhoto.putExtra("filePath", imagePath);
+        openPhoto.putStringArrayListExtra("users", users);
+        startActivity(openPhoto);
+
+
+
+
+
+
+
+
+in image view create list of strings called users (do not initialize it)
+use intent.getStringArrayListExtra to get users
+
+Intent intent = getIntent();
+        filePath = intent.getStringExtra("filePath");
+        users = intent.getStringArrayListExtra("users");
+
+
+
+
+inside identify_faces method
+pass users to the adapter
+
+        identify_face_adapter adapter =new identify_face_adapter(this,R.layout.face_identification,items,users);
+        listView.setAdapter(adapter);
