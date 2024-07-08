@@ -41,6 +41,7 @@ public class FaceDetection_Activity{
             Bitmap bitmap = BitmapFactory.decodeFile(filePath);
             int rotationAngle=getRotationAngle(filePath);
             image = InputImage.fromBitmap(bitmap, rotationAngle);
+
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -1,5 +1,6 @@
 package com.example.my_application_1;
 
+import android.graphics.Bitmap;
 import android.graphics.Rect;
 
 import java.util.ArrayList;

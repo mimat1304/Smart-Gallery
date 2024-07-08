@@ -26,6 +26,8 @@ public interface FaceDao {
     Face getFaceFromUid(int uid);
     @Update
     void updateFace(Face face);
+    @Query("SELECT uid FROM face WHERE filePath = :filePath")
+    List<Integer> getAllFaceIds(String filePath);
     @Query("SELECT * FROM Face WHERE filePath =:filePath")
     List<Face> loadByFilePath(String filePath);
     @Query("SELECT * FROM Face WHERE uid IN (:userIds)")

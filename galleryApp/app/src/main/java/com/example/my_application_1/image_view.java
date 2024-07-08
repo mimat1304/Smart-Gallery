@@ -14,6 +14,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
@@ -49,6 +50,7 @@ public class image_view extends AppCompatActivity {
     List<Integer>userIDs=new ArrayList<>();
     List<String>names= new ArrayList<>();
     List<Integer> faceIds = new ArrayList<>();
+    boolean isDetected=false;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -73,14 +75,9 @@ public class image_view extends AppCompatActivity {
             throw new RuntimeException(e);
         }
         imageView.setImageBitmap(bitmapToShow);
+        Button identifyFaces= findViewById(R.id.identificationButton);
+        identifyFaces.setVisibility(View.INVISIBLE);
         faceDetection();
-
-        try {
-
-        }
-        catch(Exception e){
-            Log.e("image view","Error",e);
-        }
     }
     public static Bitmap handleSamplingAndRotationBitmap(String imagePath) throws IOException {
         // First decode with inJustDecodeBounds=true to check dimensions
@@ -148,6 +145,11 @@ public class image_view extends AppCompatActivity {
         });
         ImageView imageView = findViewById(R.id.imageView);
         imageView.setImageBitmap(bitmapToShow);
+        Button identifyFaces= findViewById(R.id.identificationButton);
+        identifyFaces.setVisibility(View.INVISIBLE);
+        if(isDetected){
+            identifyFaces.setVisibility(View.VISIBLE);
+        }
     }
     public void identify_faces(View v){
         if(croppedFaces.size()==0){
@@ -157,6 +159,7 @@ public class image_view extends AppCompatActivity {
         setContentView(R.layout.activity_identify_faces);
         Context context=this;
         executorService.submit(() -> {
+            faceIds = db.faceDao().getAllFaceIds(filePath);
             userIDs = db.faceDao().getAllUsers(filePath);
             for (int userID : userIDs) {
                 names.add((db.userDao().findByUID(userID)).name);
@@ -186,12 +189,41 @@ public class image_view extends AppCompatActivity {
                 EditText editText = item.findViewById(R.id.name);
                 String text = editText.getText().toString();
                 final int index=i;
-                if((!(text.equals(names.get(i))) && (text.length()!=0))){
-                    executorService.submit(()-> {
-                        User user = db.userDao().findByUID(userIDs.get(index));
-                        user.name=text;
-                        db.userDao().updateUser(user);
-                    });
+                if(names.get(i).equals("Unknown")) {
+                    if ((!(text.equals(names.get(i))) && (text.length() != 0))) {
+                        executorService.submit(() -> {
+                            User user = db.userDao().findByUID(userIDs.get(index));
+                            user.name = text;
+                            db.userDao().updateUser(user);
+                        });
+                    }
+                }else{
+                    if ((!(text.equals(names.get(i))) && (text.length() != 0))) {
+                        int j = i;
+                        executorService.submit(() -> {
+                            User user_old = db.userDao().findByUID(userIDs.get(index));
+                            User user_new = db.userDao().findByName(text);
+                            if(user_new == null){
+                                int N = db.userDao().getUserListSize();
+                                user_new = new User(text, 1, embeddings[j]);
+                                user_new.uid = N+1;
+                                db.userDao().insert(user_new);
+                                Face face =db.faceDao().getFaceFromUid(faceIds.get(j));
+                                face.userID = N+1;
+                                db.faceDao().updateFace(face);
+                            }else{
+                                user_new.embeddings=meanEmbeddings(user_new.embeddings, embeddings[j], user_new.n);
+                                user_new.n=user_new.n+1;
+                                db.userDao().updateUser(user_new);
+                                Face face =db.faceDao().getFaceFromUid(faceIds.get(j));
+                                face.userID = user_new.uid;
+                                db.faceDao().updateFace(face);
+                            }
+                            user_old.embeddings = subMeanEmbeddings(user_old.embeddings, embeddings[j], user_old.n);
+                            user_old.n = user_old.n-1;
+                            db.userDao().updateUser(user_old);
+                        });
+                    }
                 }
             }
         }
@@ -228,6 +260,12 @@ public class image_view extends AppCompatActivity {
         FaceDetectionCallback callback= new FaceDetectionCallback() {
             @Override
             public void onFacesDetected(ArrayList<Rect> faces, List<Float>RollAngles) {
+                if(faces.size()==0){
+                    return;
+                }
+                isDetected=true;
+                Button identifyFaces= findViewById(R.id.identificationButton);
+                identifyFaces.setVisibility(View.VISIBLE);
                 rollAngles=RollAngles;
                 rects=faces;
                 crop_faces();
@@ -266,11 +304,6 @@ public class image_view extends AppCompatActivity {
 
             croppedFaces.add( Bitmap.createBitmap(rotatedBitmap, left, top, right - left, bottom - top));
         }
-    }
-    float[] rotatePoint(float x, float y, float centerX, float centerY, double angle) {
-        float newX = (float) ((x - centerX) * Math.cos(angle) - (y - centerY) * Math.sin(angle) + centerX);
-        float newY = (float) ((x - centerX) * Math.sin(angle) + (y - centerY) * Math.cos(angle) + centerY);
-        return new float[]{newX, newY};
     }
     protected void extractEmbeddings(){
         try {

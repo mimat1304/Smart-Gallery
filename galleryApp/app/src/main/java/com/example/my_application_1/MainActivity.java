@@ -11,6 +11,7 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -293,13 +294,16 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         List<String> allFiles= db.faceDao().loadAllFiles();
         fileSet.addAll(allFiles);
         int count=0;
+        int ptr=0;
         for(String filePath: imagePaths){
+            ptr++;
             if(fileSet.contains(filePath)) {
                 count++;
             }
             else{
                 faceDetection(filePath);
             }
+//            if(ptr==15)break;
         }
         Log.d("Total new files",""+(allFilesSize-count));
     }
@@ -307,9 +311,10 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         FaceDetectionCallback callback= new FaceDetectionCallback() {
             @Override
             public void onFacesDetected(ArrayList<Rect> faces, List<Float>rollAngles) {
+
                 userExecutiveService.submit(() -> {
                     rects = faces;
-                    crop_faces(filePath,rollAngles);
+                    crop_faces(rollAngles,filePath);
                     extractEmbeddings(filePath);
                 });
             }
@@ -323,10 +328,37 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         faceDetectionActivity.processImage(this,filePath);
         faceDetectionActivity.detectFaces(callback);
     }
-    protected void crop_faces(String filePath,List<Float>rollAngles) {
-        Bitmap image = BitmapFactory.decodeFile(filePath);
-        croppedFaces = new ArrayList<>();
+    private static Bitmap rotateImageIfRequired(Bitmap img, String imagePath) throws IOException {
+        ExifInterface ei = new ExifInterface(imagePath);
+        int orientation = ei.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
 
+        switch (orientation) {
+            case ExifInterface.ORIENTATION_ROTATE_90:
+                return rotateImage(img, 90);
+            case ExifInterface.ORIENTATION_ROTATE_180:
+                return rotateImage(img, 180);
+            case ExifInterface.ORIENTATION_ROTATE_270:
+                return rotateImage(img, 270);
+            default:
+                return img;
+        }
+    }
+    private static Bitmap rotateImage(Bitmap img, float degree) {
+        Matrix matrix = new Matrix();
+        matrix.postRotate(degree);
+        Bitmap rotatedImg = Bitmap.createBitmap(img, 0, 0, img.getWidth(), img.getHeight(), matrix, true);
+        img.recycle();
+        return rotatedImg;
+    }
+    protected void crop_faces(List<Float>rollAngles,String filePath) {
+        Bitmap bitmap=BitmapFactory.decodeFile(filePath);
+        Bitmap image;
+        try {
+            image=rotateImageIfRequired(bitmap,filePath);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        croppedFaces = new ArrayList<>();
 
         for (int i=0;i<rollAngles.size();i++) {
             float rollAngle=rollAngles.get(i);
@@ -404,7 +436,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         return meanEM;
     }
     private float similarity(float[] em1, float[] em2){
-        float ans=0;
+        float ans=0.0f;
         try{
             float dotProduct = 0.0f;
             for (int i = 0; i < em1.length; i++) {
@@ -418,10 +450,9 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             magnitude1 = (float) Math.sqrt(magnitude1);
             magnitude2 = (float) Math.sqrt(magnitude2);
             ans=dotProduct / (magnitude1 * magnitude2);
-
+            Log.d("Similarity",""+ans);
         }catch (Exception e){
             Log.e("Similarity","error",e);
-
         }
         return ans;
     }
