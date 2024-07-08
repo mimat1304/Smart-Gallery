@@ -48,8 +48,8 @@ public class image_view extends AppCompatActivity {
     AppDatabase db;
     ExecutorService executorService;
     List<Integer>userIDs=new ArrayList<>();
-    List<String>names= new ArrayList<>();
     List<Integer> faceIds = new ArrayList<>();
+    List<String> globalNames=new ArrayList<>();
     boolean isDetected=false;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -156,14 +156,17 @@ public class image_view extends AppCompatActivity {
             Toast.makeText(this, "No faces detected", Toast.LENGTH_SHORT).show();
             return;
         }
+        List<String>names= new ArrayList<>();
         setContentView(R.layout.activity_identify_faces);
         Context context=this;
         executorService.submit(() -> {
             faceIds = db.faceDao().getAllFaceIds(filePath);
             userIDs = db.faceDao().getAllUsers(filePath);
+
             for (int userID : userIDs) {
                 names.add((db.userDao().findByUID(userID)).name);
             }
+            globalNames=names;
             ListView listView= findViewById((R.id.detected_faces_list));
             List<identification_variables> items=new ArrayList<>();
             for(int i=0;i<min(croppedFaces.size(),names.size());i++){
@@ -189,8 +192,8 @@ public class image_view extends AppCompatActivity {
                 EditText editText = item.findViewById(R.id.name);
                 String text = editText.getText().toString();
                 final int index=i;
-                if(names.get(i).equals("Unknown")) {
-                    if ((!(text.equals(names.get(i))) && (text.length() != 0))) {
+                if(globalNames.get(i).equals("Unknown")) {
+                    if ((!(text.equals(globalNames.get(i))) && (text.length() != 0))) {
                         executorService.submit(() -> {
                             User user = db.userDao().findByUID(userIDs.get(index));
                             user.name = text;
@@ -198,7 +201,7 @@ public class image_view extends AppCompatActivity {
                         });
                     }
                 }else{
-                    if ((!(text.equals(names.get(i))) && (text.length() != 0))) {
+                    if ((!(text.equals(globalNames.get(i))) && (text.length() != 0))) {
                         int j = i;
                         executorService.submit(() -> {
                             User user_old = db.userDao().findByUID(userIDs.get(index));
