@@ -47,10 +47,11 @@ public class image_view extends AppCompatActivity {
 
     AppDatabase db;
     ExecutorService executorService;
-    List<Integer>userIDs=new ArrayList<>();
+    List<Integer> userIDs=new ArrayList<>();
     List<Integer> faceIds = new ArrayList<>();
     List<String> globalNames=new ArrayList<>();
     boolean isDetected=false;
+    List<String>users;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -65,6 +66,8 @@ public class image_view extends AppCompatActivity {
         executorService=Executors.newSingleThreadExecutor();
         Intent intent = getIntent();
         filePath = intent.getStringExtra("filePath");
+        users = intent.getStringArrayListExtra("users");
+
         ImageView imageView = findViewById(R.id.imageView);
         Bitmap img= BitmapFactory.decodeFile(filePath);
         try {
@@ -176,7 +179,7 @@ public class image_view extends AppCompatActivity {
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    identify_face_adapter adapter = new identify_face_adapter(context, R.layout.face_identification, items);
+                    identify_face_adapter adapter =new identify_face_adapter(context,R.layout.face_identification,items,users);
                     listView.setAdapter(adapter);
                 }
             });
@@ -281,7 +284,7 @@ public class image_view extends AppCompatActivity {
             }
         };
         FaceDetection_Activity faceDetectionActivity= new FaceDetection_Activity();
-        faceDetectionActivity.processImage(this,filePath);
+        faceDetectionActivity.processImage(this,bitmap);
         faceDetectionActivity.detectFaces(callback);
 
     }

@@ -89,6 +89,10 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         requestPermissions();
 
     }
+    protected void onResume() {
+        super.onResume();
+        userExecutiveService.submit(()->userList = db.userDao().getAll());
+    }
     private void requestPermissions(){
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             // Android 13 (API level 33) and above
@@ -133,7 +137,6 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                     Log.d("MainActivity", "Background thread started");
                     userList = db.userDao().getAll();
                     Log.d("MainActivity", "UserList size= " + userList.size());
-
                     processData();
                 } catch (Exception e) {
                     Log.e("MainActivity", "Error fetching user list", e);
@@ -175,9 +178,16 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             }
             return;
         }
-
+        ArrayList<String> users = new ArrayList<>();
+        Log.d("samsung", "hello"+userList.size());
+        for(User user : userList){
+            if(user.name.equals("Unknown")) continue;
+            users.add(user.name);
+            Log.d("samsung", "hello "+user.name);
+        }
         Intent openPhoto = new Intent(this, image_view.class);
         openPhoto.putExtra("filePath", imagePath);
+        openPhoto.putStringArrayListExtra("users", users);
         startActivity(openPhoto);
     }
     @Override
@@ -289,7 +299,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         return imagePaths;
     }
 
-    private void processData(){
+    private void processData() throws IOException {
         Set<String> fileSet = new HashSet<>();
         List<String> allFiles= db.faceDao().loadAllFiles();
         fileSet.addAll(allFiles);
@@ -301,20 +311,22 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 count++;
             }
             else{
-                faceDetection(filePath);
+                Bitmap bitmap=BitmapFactory.decodeFile(filePath);
+                bitmap=rotateImageIfRequired(bitmap,filePath);
+                faceDetection(filePath,bitmap);
             }
 //            if(ptr==15)break;
         }
         Log.d("Total new files",""+(allFilesSize-count));
     }
-    protected void faceDetection(String filePath){
+    protected void faceDetection(String filePath,Bitmap bitmap){
         FaceDetectionCallback callback= new FaceDetectionCallback() {
             @Override
             public void onFacesDetected(ArrayList<Rect> faces, List<Float>rollAngles) {
 
                 userExecutiveService.submit(() -> {
                     rects = faces;
-                    crop_faces(rollAngles,filePath);
+                    crop_faces(rollAngles,bitmap);
                     extractEmbeddings(filePath);
                 });
             }
@@ -325,7 +337,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             }
         };
         FaceDetection_Activity faceDetectionActivity= new FaceDetection_Activity();
-        faceDetectionActivity.processImage(this,filePath);
+        faceDetectionActivity.processImage(this,bitmap);
         faceDetectionActivity.detectFaces(callback);
     }
     private static Bitmap rotateImageIfRequired(Bitmap img, String imagePath) throws IOException {
@@ -350,14 +362,9 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         img.recycle();
         return rotatedImg;
     }
-    protected void crop_faces(List<Float>rollAngles,String filePath) {
-        Bitmap bitmap=BitmapFactory.decodeFile(filePath);
-        Bitmap image;
-        try {
-            image=rotateImageIfRequired(bitmap,filePath);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    protected void crop_faces(List<Float>rollAngles,Bitmap bitmap) {
+        Bitmap image=bitmap;
+
         croppedFaces = new ArrayList<>();
 
         for (int i=0;i<rollAngles.size();i++) {

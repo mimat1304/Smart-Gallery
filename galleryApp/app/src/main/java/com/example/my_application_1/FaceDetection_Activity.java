@@ -8,6 +8,7 @@ import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.content.Context;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
@@ -32,34 +33,11 @@ import java.util.List;
 
 public class FaceDetection_Activity{
     InputImage image;
-    protected void processImage(Context context,String filePath){
+    protected void processImage(Context context,Bitmap bitmap){
         if (context == null) {
             throw new IllegalArgumentException("Context cannot be null");
         }
-
-        try {
-            Bitmap bitmap = BitmapFactory.decodeFile(filePath);
-            int rotationAngle=getRotationAngle(filePath);
-            image = InputImage.fromBitmap(bitmap, rotationAngle);
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-    protected int getRotationAngle(String imagePath) throws IOException {
-        ExifInterface ei = new ExifInterface(imagePath);
-        int orientation = ei.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-
-        switch (orientation) {
-            case ExifInterface.ORIENTATION_ROTATE_90:
-                return 90;
-            case ExifInterface.ORIENTATION_ROTATE_180:
-                return 180;
-            case ExifInterface.ORIENTATION_ROTATE_270:
-                return 270;
-            default:
-                return 0;
-        }
+        image = InputImage.fromBitmap(bitmap,0);
     }
     protected void detectFaces(FaceDetectionCallback callback){
         FaceDetector detector = FaceDetection.getClient();
