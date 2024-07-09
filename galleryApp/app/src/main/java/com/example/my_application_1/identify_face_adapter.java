@@ -41,7 +41,18 @@ public class identify_face_adapter extends ArrayAdapter<identification_variables
 
         ArrayAdapter<String> dropDown = new ArrayAdapter<>(context, android.R.layout.simple_dropdown_item_1line, users);
         editText.setAdapter(dropDown);
-        editText.setHint(items.get(position).getName());
+
+        TextView identifiedName= convertView.findViewById(R.id.identifiedName);
+        EditText edit_name= convertView.findViewById(R.id.editText);
+
+        if(items.get(position).getName().equals("Unknown")){
+            identifiedName.setVisibility(View.INVISIBLE);
+            edit_name.setVisibility(View.INVISIBLE);
+        }
+        else{
+            identifiedName.setText(items.get(position).getName());
+        }
+
 
         ImageView imageView = convertView.findViewById(R.id.detected_face);
         Bitmap currentItem = items.get(position).getBitmap();

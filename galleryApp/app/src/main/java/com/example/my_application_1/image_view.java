@@ -14,6 +14,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -191,9 +192,17 @@ public class image_view extends AppCompatActivity {
         for (int i = 0; i < adapter.getCount(); i++) {
             View item = listView.getChildAt(i);
             if (item != null) {
-                EditText editText = item.findViewById(R.id.name);
-                String text = editText.getText().toString();
+                AutoCompleteTextView autoCompleteTextView = item.findViewById(R.id.name);
+                EditText editName= item.findViewById(R.id.editText);
+                String text = autoCompleteTextView.getText().toString();
                 final int index=i;
+                if(!editName.getText().toString().equals("")){
+                    executorService.submit(()->{
+                        User user = db.userDao().findByUID(userIDs.get(index));
+                        user.name=editName.getText().toString();
+                        db.userDao().updateUser(user);
+                    });
+                }
                 if(globalNames.get(i).equals("Unknown")) {
                     if ((!(text.equals(globalNames.get(i))) && (text.length() != 0))) {
                         executorService.submit(() -> {
