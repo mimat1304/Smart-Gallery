@@ -69,10 +69,9 @@ public class image_view extends AppCompatActivity {
         users = intent.getStringArrayListExtra("users");
 
         ImageView imageView = findViewById(R.id.imageView);
-        Bitmap img= BitmapFactory.decodeFile(filePath);
         try {
-            bitmap = rotateImageIfRequired(img, filePath);
-            bitmapToShow=handleSamplingAndRotationBitmap(filePath);
+            bitmap = handleSamplingAndRotationBitmap(filePath);
+            bitmapToShow=bitmap;
 
         } catch (IOException e) {
             throw new RuntimeException(e);

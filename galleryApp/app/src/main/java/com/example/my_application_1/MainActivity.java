@@ -36,11 +36,8 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.Toast;
 
-import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -156,7 +153,6 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 initializeApp();
             } else {
                 Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show();
-                onDestroy();
             }
         }
     }
@@ -311,11 +307,10 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 count++;
             }
             else{
-                Bitmap bitmap=BitmapFactory.decodeFile(filePath);
-                bitmap=rotateImageIfRequired(bitmap,filePath);
+                Bitmap bitmap = handleSamplingAndRotationBitmap(filePath);
                 faceDetection(filePath,bitmap);
             }
-//            if(ptr==15)break;
+//            if(ptr==25)break;
         }
         Log.d("Total new files",""+(allFilesSize-count));
     }
@@ -339,6 +334,37 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         FaceDetection_Activity faceDetectionActivity= new FaceDetection_Activity();
         faceDetectionActivity.processImage(this,bitmap);
         faceDetectionActivity.detectFaces(callback);
+    }
+    public static Bitmap handleSamplingAndRotationBitmap(String imagePath) throws IOException {
+        // First decode with inJustDecodeBounds=true to check dimensions
+        final BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(imagePath, options);
+
+        options.inSampleSize = calculateInSampleSize(options, 1024, 1024);
+
+        options.inJustDecodeBounds = false;
+        Bitmap img = BitmapFactory.decodeFile(imagePath, options);
+
+        return rotateImageIfRequired(img, imagePath);
+    }
+    private static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+
+        if (height > reqHeight || width > reqWidth) {
+            final int halfHeight = height / 2;
+            final int halfWidth = width / 2;
+
+            // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+            // height and width larger than the requested height and width.
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2;
+            }
+        }
+
+        return inSampleSize;
     }
     private static Bitmap rotateImageIfRequired(Bitmap img, String imagePath) throws IOException {
         ExifInterface ei = new ExifInterface(imagePath);
