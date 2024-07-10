@@ -29,6 +29,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -202,6 +203,7 @@ public class image_view extends AppCompatActivity {
                         user.name=editName.getText().toString();
                         db.userDao().updateUser(user);
                     });
+                    break;
                 }
                 if(globalNames.get(i).equals("Unknown")) {
                     if ((!(text.equals(globalNames.get(i))) && (text.length() != 0))) {
@@ -235,7 +237,11 @@ public class image_view extends AppCompatActivity {
                             }
                             user_old.embeddings = subMeanEmbeddings(user_old.embeddings, embeddings[j], user_old.n);
                             user_old.n = user_old.n-1;
+                            // if user_old.n = 0 user can be deleted
                             db.userDao().updateUser(user_old);
+                            float similarity_with_old=similarity(user_old.embeddings,embeddings[j]);
+                            float similarity_with_new=similarity(user_new.embeddings,embeddings[j]);
+                            writeLogToCSV(filePath,faceIds.get(j),similarity_with_old,similarity_with_new);
                         });
                     }
                 }
@@ -243,6 +249,44 @@ public class image_view extends AppCompatActivity {
         }
         Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         onResume();
+    }
+    private void writeLogToCSV(String filePath,int faceId, double similarity1, double similarity2) {
+        String FILE_NAME="logs.csv";
+        File csvFile = new File(getFilesDir(), FILE_NAME);
+        boolean flag=false;
+        if(!csvFile.exists()){
+            flag=true;
+        }
+        String csvRow = filePath + "," + faceId + "," + similarity1 + "," + similarity2;
+        try (FileOutputStream fos = openFileOutput(FILE_NAME, MODE_APPEND)) {
+            if (flag) {
+                String headers = "FilePath,FaceId,Similarity with previous cluster,Similarity with new cluster";
+                fos.write((headers + "\n").getBytes());
+            }
+            fos.write((csvRow + "\n").getBytes());
+        } catch (IOException e) {
+            Log.e("image_view", "Error writing to CSV file", e);
+        }
+    }
+    private float similarity(float[] em1, float[] em2){
+        float ans=0.0f;
+        try{
+            float dotProduct = 0.0f;
+            for (int i = 0; i < em1.length; i++) {
+                dotProduct += em1[i] * em2[i];
+            }
+            float magnitude1 = 0.0f, magnitude2 = 0.0f;
+            for (int i = 0; i < em1.length; i++) {
+                magnitude1 += (em1[i] * em1[i]);
+                magnitude2 += (em2[i] * em2[i]);
+            }
+            magnitude1 = (float) Math.sqrt(magnitude1);
+            magnitude2 = (float) Math.sqrt(magnitude2);
+            ans=dotProduct / (magnitude1 * magnitude2);
+        }catch (Exception e){
+            Log.e("Similarity","error",e);
+        }
+        return ans;
     }
     private float[] subMeanEmbeddings(float[] cur_em,float[] em,int n){
         float[] meanEM= new float[em.length];

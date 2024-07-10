@@ -56,10 +56,8 @@ public class FaceDetection_Activity{
                                         // ...
                                         List<Float> rollAngles= new ArrayList<>();
                                         float mxWidth = 0.01f;
-                                        Log.d("faces size",""+faces.size());
                                         for( Face face:faces){
                                             Rect bounds = face.getBoundingBox();
-                                            Log.d("widths",""+bounds.width());
                                             mxWidth = Math.max(mxWidth,bounds.width());
                                         }
                                         detectFacesWithThreshold(callback,mxWidth);
@@ -88,7 +86,6 @@ public class FaceDetection_Activity{
                                         // Task completed successfully
                                         // ...
                                         List<Float> rollAngles= new ArrayList<>();
-                                        Log.d("faces size",""+faces.size());
                                         for( Face face:faces){
                                             Rect bounds = face.getBoundingBox();
                                             if(bounds.width() < minFaceSize){
@@ -97,7 +94,6 @@ public class FaceDetection_Activity{
                                             rollAngles.add(face.getHeadEulerAngleZ());
                                             rects.add(bounds);
                                         }
-                                        Log.d("rectsSize",""+rects.size());
                                         callback.onFacesDetected(rects,rollAngles);
                                     }
                                 })

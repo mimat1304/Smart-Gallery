@@ -310,7 +310,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 Bitmap bitmap = handleSamplingAndRotationBitmap(filePath);
                 faceDetection(filePath,bitmap);
             }
-//            if(ptr==25)break;
+//            if(ptr==17)break;
         }
         Log.d("Total new files",""+(allFilesSize-count));
     }
@@ -431,23 +431,19 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         }
     }
     private void checkUsers(float[] cur_em,String filePath){
-        boolean flag = false;
-        float threshold=0.63f;
+        float maxThreshold = -1f;
+        float threshold=0.65f;
+        int maxThresholdInd = -1;
         for(int i=0;i<userList.size();i++){
             User user= userList.get(i);
             float[] em=user.embeddings;
-            if (similarity(em,cur_em)>=threshold){
-                user.embeddings=meanEmbeddings(em, cur_em, user.n);
-                user.n=user.n+1;
-                Face face =new Face(cur_em,filePath,i+1);
-                userList.set(i,user);
-                db.userDao().updateUser(user);
-                db.faceDao().insert(face);
-                flag=true;
-                break;
+            float sim = similarity(em,cur_em,filePath);
+            if (sim>=maxThreshold){
+                maxThreshold = sim;
+                maxThresholdInd=i;
             }
         }
-        if(!flag){
+        if(maxThreshold<threshold){
             try {
                 User user = new User("Unknown", 1, cur_em);
                 user.uid = userList.size() + 1;
@@ -459,6 +455,15 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             }catch (Exception e){
                 Log.e("!flag","error",e);
             }
+        }else{
+            User user= userList.get(maxThresholdInd);
+            float[] em=user.embeddings;
+            user.embeddings=meanEmbeddings(em, cur_em, user.n);
+            user.n=user.n+1;
+            Face face =new Face(cur_em,filePath,maxThresholdInd+1);
+            userList.set(maxThresholdInd,user);
+            db.userDao().updateUser(user);
+            db.faceDao().insert(face);
         }
     }
     private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
@@ -468,7 +473,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         }
         return meanEM;
     }
-    private float similarity(float[] em1, float[] em2){
+    private float similarity(float[] em1, float[] em2, String filePath){
         float ans=0.0f;
         try{
             float dotProduct = 0.0f;
@@ -483,7 +488,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             magnitude1 = (float) Math.sqrt(magnitude1);
             magnitude2 = (float) Math.sqrt(magnitude2);
             ans=dotProduct / (magnitude1 * magnitude2);
-            Log.d("Similarity",""+ans);
+            Log.d("Similarity",""+ans+" "+filePath);
         }catch (Exception e){
             Log.e("Similarity","error",e);
         }
