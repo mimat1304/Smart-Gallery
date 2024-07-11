@@ -30,8 +30,8 @@ public interface FaceDao {
     List<Integer> getAllFaceIds(String filePath);
     @Query("SELECT * FROM Face WHERE filePath =:filePath")
     List<Face> loadByFilePath(String filePath);
-    @Query("SELECT * FROM Face WHERE uid IN (:userIds)")
-    List<Face> loadAllByIds(int[] userIds);
+    @Query("SELECT * FROM Face WHERE uid = :userId")
+    List<Face> loadAllByUserIds(int userId);
 
     @Delete
     void delete(Face face);

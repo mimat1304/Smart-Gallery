@@ -432,7 +432,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     }
     private void checkUsers(float[] cur_em,String filePath){
         float maxThreshold = -1f;
-        float threshold=0.65f;
+        float threshold=0.63f;
         int maxThresholdInd = -1;
         for(int i=0;i<userList.size();i++){
             User user= userList.get(i);
@@ -458,7 +458,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         }else{
             User user= userList.get(maxThresholdInd);
             float[] em=user.embeddings;
-            user.embeddings=meanEmbeddings(em, cur_em, user.n);
+            user.embeddings=meanEmbeddings(cur_em,em, user.n);
             user.n=user.n+1;
             Face face =new Face(cur_em,filePath,maxThresholdInd+1);
             userList.set(maxThresholdInd,user);

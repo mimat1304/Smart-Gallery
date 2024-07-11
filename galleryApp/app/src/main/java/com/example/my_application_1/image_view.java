@@ -228,20 +228,22 @@ public class image_view extends AppCompatActivity {
                                 face.userID = N+1;
                                 db.faceDao().updateFace(face);
                             }else{
-                                user_new.embeddings=meanEmbeddings(user_new.embeddings, embeddings[j], user_new.n);
+                                user_new.embeddings=meanEmbeddings(embeddings[j], user_new.embeddings, user_new.n);
                                 user_new.n=user_new.n+1;
                                 db.userDao().updateUser(user_new);
                                 Face face =db.faceDao().getFaceFromUid(faceIds.get(j));
                                 face.userID = user_new.uid;
                                 db.faceDao().updateFace(face);
                             }
-                            user_old.embeddings = subMeanEmbeddings(user_old.embeddings, embeddings[j], user_old.n);
+                            user_old.embeddings = subMeanEmbeddings(embeddings[j],user_old.embeddings, user_old.n);
                             user_old.n = user_old.n-1;
                             // if user_old.n = 0 user can be deleted
                             db.userDao().updateUser(user_old);
                             float similarity_with_old=similarity(user_old.embeddings,embeddings[j]);
                             float similarity_with_new=similarity(user_new.embeddings,embeddings[j]);
                             writeLogToCSV(filePath,faceIds.get(j),similarity_with_old,similarity_with_new);
+                            List<Face> faces=db.faceDao().loadAllByUserIds(user_old.uid);
+                            checkFaces(faces,user_old,user_new);
                         });
                     }
                 }
@@ -249,6 +251,26 @@ public class image_view extends AppCompatActivity {
         }
         Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         onResume();
+    }
+    void checkFaces(List<Face>faces,User user_old,User user_new){
+        float[] oldEM=user_old.embeddings;
+        float[] newEM=user_new.embeddings;
+        int old_n=user_old.n;
+        int new_n=user_new.n;
+        for(Face face:faces){
+            float[] cur_em = face.embeddings;
+            float[] newOldEM = subMeanEmbeddings(cur_em,oldEM,old_n);
+            if(similarity(newOldEM,cur_em)<similarity(newEM,cur_em)){
+                newEM=meanEmbeddings(cur_em,newEM,new_n);
+                user_new.n = ++new_n;
+                user_old.n = --old_n;
+                user_new.embeddings = newEM;
+                user_old.embeddings = newOldEM;
+                db.userDao().updateUser(user_new);
+                db.userDao().updateUser(user_old);
+                oldEM = newOldEM;
+            }
+        }
     }
     private void writeLogToCSV(String filePath,int faceId, double similarity1, double similarity2) {
         String FILE_NAME="logs.csv";
@@ -384,10 +406,9 @@ public class image_view extends AppCompatActivity {
         listView.setAdapter(adapter);
     }
 
-
-
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        executorService.shutdown();
     }
 }
