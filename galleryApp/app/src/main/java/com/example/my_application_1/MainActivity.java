@@ -175,11 +175,9 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             return;
         }
         ArrayList<String> users = new ArrayList<>();
-        Log.d("samsung", "hello"+userList.size());
         for(User user : userList){
             if(user.name.equals("Unknown")) continue;
             users.add(user.name);
-            Log.d("samsung", "hello "+user.name);
         }
         Intent openPhoto = new Intent(this, image_view.class);
         openPhoto.putExtra("filePath", imagePath);

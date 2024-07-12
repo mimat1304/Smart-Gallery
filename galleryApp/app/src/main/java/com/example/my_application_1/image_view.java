@@ -1,5 +1,6 @@
 package com.example.my_application_1;
 
+import static java.lang.Double.NaN;
 import static java.lang.Double.min;
 import android.content.Context;
 import android.content.Intent;
@@ -54,6 +55,7 @@ public class image_view extends AppCompatActivity {
     List<String> globalNames=new ArrayList<>();
     boolean isDetected=false;
     List<String>users;
+    float[] zeroEmbeddings=new float[512];
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -235,13 +237,18 @@ public class image_view extends AppCompatActivity {
                                 face.userID = user_new.uid;
                                 db.faceDao().updateFace(face);
                             }
-                            user_old.embeddings = subMeanEmbeddings(embeddings[j],user_old.embeddings, user_old.n);
-                            user_old.n = user_old.n-1;
-                            // if user_old.n = 0 user can be deleted
-                            db.userDao().updateUser(user_old);
-                            float similarity_with_old=similarity(user_old.embeddings,embeddings[j]);
-                            float similarity_with_new=similarity(user_new.embeddings,embeddings[j]);
-                            writeLogToCSV(filePath,faceIds.get(j),similarity_with_old,similarity_with_new);
+                            if(user_old.n-1==0){
+                                user_old.embeddings = zeroEmbeddings;
+                                float similarity_with_new=similarity(user_new.embeddings,embeddings[j]);
+                                writeLogToCSV(filePath,faceIds.get(j),NaN,similarity_with_new);
+                            }else {
+                                user_old.embeddings = subMeanEmbeddings(embeddings[j], user_old.embeddings, user_old.n);
+                                user_old.n = user_old.n - 1;
+                                db.userDao().updateUser(user_old);
+                                float similarity_with_old = similarity(user_old.embeddings, embeddings[j]);
+                                float similarity_with_new = similarity(user_new.embeddings, embeddings[j]);
+                                writeLogToCSV(filePath, faceIds.get(j), similarity_with_old, similarity_with_new);
+                            }
                             List<Face> faces=db.faceDao().loadAllByUserIds(user_old.uid);
                             checkFaces(faces,user_old,user_new);
                         });
@@ -260,15 +267,26 @@ public class image_view extends AppCompatActivity {
         for(Face face:faces){
             float[] cur_em = face.embeddings;
             float[] newOldEM = subMeanEmbeddings(cur_em,oldEM,old_n);
-            if(similarity(newOldEM,cur_em)<similarity(newEM,cur_em)){
+            if((old_n-1==0 && similarity(newEM,cur_em)>=0.63) || (old_n-1>0 && similarity(newOldEM,cur_em)<similarity(newEM,cur_em))){
                 newEM=meanEmbeddings(cur_em,newEM,new_n);
                 user_new.n = ++new_n;
                 user_old.n = --old_n;
                 user_new.embeddings = newEM;
-                user_old.embeddings = newOldEM;
+                if(old_n==0){
+                    user_old.embeddings = zeroEmbeddings;
+                }else {
+                    user_old.embeddings = newOldEM;
+                }
+                face.userID=user_new.uid;
+                db.faceDao().updateFace(face);
                 db.userDao().updateUser(user_new);
                 db.userDao().updateUser(user_old);
+
                 oldEM = newOldEM;
+                Log.d("checkFaces","User updated for face "+face.uid);
+            }
+            else{
+                Log.d("checkFaces","User not updated for face "+face.uid);
             }
         }
     }
