@@ -7,7 +7,13 @@
 
     <ImageView
         android:id="@+id/Face"
-        android:layout_width="match_parent"
-        android:layout_height="200dp"
+        android:layout_width="202dp"
+        android:layout_height="178dp"
         android:scaleType="centerCrop" />
+
+    <TextView
+        android:id="@+id/embeddings"
+        android:layout_width="398dp"
+        android:layout_height="231dp"
+        android:textSize="18sp" />
 </LinearLayout>

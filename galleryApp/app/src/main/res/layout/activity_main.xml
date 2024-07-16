@@ -7,13 +7,33 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <ListView
+    <GridView
         android:id="@+id/gallery"
-        android:layout_width="407dp"
-        android:layout_height="908dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:horizontalSpacing="4dp"
+        android:numColumns="4"
+        android:stretchMode="columnWidth"
+        android:verticalSpacing="4dp" />
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/shareLayout"
+        android:layout_width="416dp"
+        android:layout_height="83dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintStart_toStartOf="parent">
+
+        <Button
+            android:id="@+id/share"
+            android:layout_width="170dp"
+            android:layout_height="56dp"
+            android:onClick="shareGroup"
+            android:text="SHARE"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
