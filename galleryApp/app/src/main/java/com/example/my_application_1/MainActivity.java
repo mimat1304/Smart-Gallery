@@ -299,20 +299,24 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         fileSet.addAll(allFiles);
         int count=0;
         int ptr=0;
+        boolean flag=false;
         for(String filePath: imagePaths){
             ptr++;
+            if(filePath.equals(imagePaths.get(imagePaths.size()-1))){
+                flag=true;
+            }
             if(fileSet.contains(filePath)) {
                 count++;
             }
             else{
                 Bitmap bitmap = handleSamplingAndRotationBitmap(filePath);
-                faceDetection(filePath,bitmap);
+                faceDetection(filePath,bitmap,flag);
             }
 //            if(ptr==17)break;
         }
         Log.d("Total new files",""+(allFilesSize-count));
     }
-    protected void faceDetection(String filePath,Bitmap bitmap){
+    protected void faceDetection(String filePath,Bitmap bitmap,boolean flag){
         FaceDetectionCallback callback= new FaceDetectionCallback() {
             @Override
             public void onFacesDetected(ArrayList<Rect> faces, List<Float>rollAngles) {
@@ -320,7 +324,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 userExecutiveService.submit(() -> {
                     rects = faces;
                     crop_faces(rollAngles,bitmap);
-                    extractEmbeddings(filePath);
+                    extractEmbeddings(filePath,flag,rollAngles);
                 });
             }
 
@@ -412,26 +416,35 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         }
     }
 
-    protected void extractEmbeddings(String filePath){
+    protected void extractEmbeddings(String filePath,boolean flag,List<Float> rollAngles){
         try {
             FaceNetEmbeddings faceNetEmbeddings = new FaceNetEmbeddings(this,"facenet.tflite");
             embeddings = faceNetEmbeddings.getEmbeddings(croppedFaces);
-            updateData(filePath);
+            updateData(filePath,flag,rollAngles);
         }
         catch(IOException e){
             e.printStackTrace();
         }
     }
 
-    protected void updateData(String filePath){
+    protected void updateData(String filePath,boolean flag,List<Float> rollAngles){
+        int i=0;
         for(float[] em:embeddings){
-            checkUsers(em,filePath);
+            checkUsers(em,filePath,flag,rollAngles.get(i),rects.get(i));
+            i++;
         }
     }
-    private void checkUsers(float[] cur_em,String filePath){
+    private void checkUsers(float[] cur_em,String filePath,boolean flag,float rollAngle,Rect faceRect){
         float maxThreshold = -1f;
         float threshold=0.63f;
         int maxThresholdInd = -1;
+        float[] coordinates= new float[4];
+
+        coordinates[0] = faceRect.left;
+        coordinates[1] = faceRect.top;
+        coordinates[2] = faceRect.right;
+        coordinates[3] = faceRect.bottom;
+
         for(int i=0;i<userList.size();i++){
             User user= userList.get(i);
             float[] em=user.embeddings;
@@ -447,7 +460,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 user.uid = userList.size() + 1;
 
                 userList.add(user);
-                Face face = new Face(cur_em, filePath, userList.size());
+                Face face = new Face(cur_em,coordinates,rollAngle,filePath, userList.size());
                 db.userDao().insert(user);
                 db.faceDao().insert(face);
             }catch (Exception e){
@@ -458,10 +471,20 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             float[] em=user.embeddings;
             user.embeddings=meanEmbeddings(cur_em,em, user.n);
             user.n=user.n+1;
-            Face face =new Face(cur_em,filePath,maxThresholdInd+1);
+            Face face =new Face(cur_em,coordinates,rollAngle,filePath,maxThresholdInd+1);
             userList.set(maxThresholdInd,user);
             db.userDao().updateUser(user);
             db.faceDao().insert(face);
+        }
+        if(flag){
+            Log.d("MainActivity","Database work done");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(MainActivity.this,"Database work done",Toast.LENGTH_SHORT).show();
+                }
+            });
+
         }
     }
     private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
@@ -486,7 +509,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             magnitude1 = (float) Math.sqrt(magnitude1);
             magnitude2 = (float) Math.sqrt(magnitude2);
             ans=dotProduct / (magnitude1 * magnitude2);
-            Log.d("Similarity",""+ans+" "+filePath);
+//            Log.d("Similarity",""+ans+" "+filePath);
         }catch (Exception e){
             Log.e("Similarity","error",e);
         }

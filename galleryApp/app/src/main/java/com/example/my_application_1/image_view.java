@@ -14,7 +14,9 @@ import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
@@ -23,6 +25,7 @@ import android.widget.ListView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
@@ -208,49 +211,47 @@ public class image_view extends AppCompatActivity {
                     break;
                 }
                 if(globalNames.get(i).equals("Unknown")) {
-                    if ((!(text.equals(globalNames.get(i))) && (text.length() != 0))) {
+                    if (text.length() != 0) {
+                        int j = i;
                         executorService.submit(() -> {
-                            User user = db.userDao().findByUID(userIDs.get(index));
-                            user.name = text;
-                            db.userDao().updateUser(user);
+                            List<User> users_new = db.userDao().findByName(text);
+                            if(users_new.size() == 0) {
+                                User user = db.userDao().findByUID(userIDs.get(index));
+                                user.name = text;
+                                db.userDao().updateUser(user);
+                            }else{
+                                try {
+                                    showDialog(users_new,null,j);
+                                } catch (IOException e){
+                                    Log.e("dialog","error",e);
+                                }
+                            }
                         });
                     }
                 }else{
-                    if ((!(text.equals(globalNames.get(i))) && (text.length() != 0))) {
+                    if (text.length() != 0) {
                         int j = i;
                         executorService.submit(() -> {
                             User user_old = db.userDao().findByUID(userIDs.get(index));
-                            User user_new = db.userDao().findByName(text);
-                            if(user_new == null){
+                            List<User> users_new = db.userDao().findByName(text);
+
+                            if(users_new.size()==0){
                                 int N = db.userDao().getUserListSize();
-                                user_new = new User(text, 1, embeddings[j]);
+                                User user_new = new User(text, 1, embeddings[j]);
                                 user_new.uid = N+1;
                                 db.userDao().insert(user_new);
                                 Face face =db.faceDao().getFaceFromUid(faceIds.get(j));
                                 face.userID = N+1;
                                 db.faceDao().updateFace(face);
+                                continueSaveOperation(user_old,user_new,j);
                             }else{
-                                user_new.embeddings=meanEmbeddings(embeddings[j], user_new.embeddings, user_new.n);
-                                user_new.n=user_new.n+1;
-                                db.userDao().updateUser(user_new);
-                                Face face =db.faceDao().getFaceFromUid(faceIds.get(j));
-                                face.userID = user_new.uid;
-                                db.faceDao().updateFace(face);
+                                try {
+                                    showDialog(users_new,user_old,j);
+                                } catch (IOException e){
+                                    Log.e("dialog","error",e);
+                                }
                             }
-                            if(user_old.n-1==0){
-                                user_old.embeddings = zeroEmbeddings;
-                                float similarity_with_new=similarity(user_new.embeddings,embeddings[j]);
-                                writeLogToCSV(filePath,faceIds.get(j),NaN,similarity_with_new);
-                            }else {
-                                user_old.embeddings = subMeanEmbeddings(embeddings[j], user_old.embeddings, user_old.n);
-                                user_old.n = user_old.n - 1;
-                                db.userDao().updateUser(user_old);
-                                float similarity_with_old = similarity(user_old.embeddings, embeddings[j]);
-                                float similarity_with_new = similarity(user_new.embeddings, embeddings[j]);
-                                writeLogToCSV(filePath, faceIds.get(j), similarity_with_old, similarity_with_new);
-                            }
-                            List<Face> faces=db.faceDao().loadAllByUserIds(user_old.uid);
-                            checkFaces(faces,user_old,user_new);
+
                         });
                     }
                 }
@@ -258,6 +259,106 @@ public class image_view extends AppCompatActivity {
         }
         Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         onResume();
+    }
+    private void showDialog(List<User> users_new,User user_old,int j) throws IOException {
+        // Inflate the dialog layout
+        List<Item> items = new ArrayList<>();
+        String text= users_new.get(0).name;
+        for(int i=0;i<users_new.size();i++) {
+            User user = users_new.get(i);
+            if (user.n == 0) {
+                continue;
+            }
+            Face face = db.faceDao().loadAllByUserIds(user.uid).get(0);
+            float[] coordinates = face.coordinates;
+            float rollAngle = face.rollAngle;
+            String filePath = face.filePath;
+            Bitmap bitmap = handleSamplingAndRotationBitmap(filePath);
+            Matrix matrix = new Matrix();
+            matrix.setRotate(rollAngle, (coordinates[0] + coordinates[2]) / 2, (coordinates[1] + coordinates[3]) / 2);
+            Bitmap rotatedBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), bitmap.getConfig());
+
+            Canvas canvas = new Canvas(rotatedBitmap);
+            canvas.drawBitmap(bitmap, matrix, new Paint());
+
+            int left = Math.max(0, (int) coordinates[0]);
+            int top = Math.max(0, (int) coordinates[1]);
+            int right = Math.min(rotatedBitmap.getWidth(), (int) coordinates[2]);
+            int bottom = Math.min(rotatedBitmap.getHeight(), (int) coordinates[3]);
+
+            bitmap = Bitmap.createBitmap(rotatedBitmap, left, top, right - left, bottom - top);
+            items.add(new Item(bitmap, user.name));
+        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                LayoutInflater inflater = getLayoutInflater();
+                View dialogView = inflater.inflate(R.layout.dialog_pop_up, null);
+
+                // Create the dialog builder
+                AlertDialog.Builder builder = new AlertDialog.Builder(image_view.this);
+                builder.setView(dialogView);
+                ListView listView = dialogView.findViewById(R.id.dialog_list_view);
+                DialogCustomAdapter adapter = new DialogCustomAdapter(image_view.this, items);
+                listView.setAdapter(adapter);
+                AlertDialog dialog = builder.create();
+                dialog.show();
+
+                listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                    @Override
+                    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                        executorService.submit(()->{
+                            User user_new = users_new.get(position);
+                            user_new.embeddings=meanEmbeddings(embeddings[j], user_new.embeddings, user_new.n);
+                            user_new.n=user_new.n+1;
+                            db.userDao().updateUser(user_new);
+                            Face face =db.faceDao().getFaceFromUid(faceIds.get(j));
+                            face.userID = user_new.uid;
+                            db.faceDao().updateFace(face);
+                            continueSaveOperation(user_old,user_new,j);
+                        });
+
+                        Toast.makeText(image_view.this, "Selected position: " + position, Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    }
+                });
+                Button dialogButton = dialogView.findViewById(R.id.dialog_button);
+                dialogButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Toast.makeText(image_view.this, "None", Toast.LENGTH_SHORT).show();
+                        executorService.submit(()->{
+                            User user = db.userDao().findByUID(userIDs.get(j));
+                            user.name = text;
+                            db.userDao().updateUser(user);
+                        });
+                        dialog.dismiss();
+                    }
+                });
+            }
+        });
+
+
+    }
+
+    void continueSaveOperation(User user_old, User user_new,int j){
+        if(user_old == null){
+            return;
+        }
+        if(user_old.n-1==0){
+            user_old.embeddings = zeroEmbeddings;
+            float similarity_with_new=similarity(user_new.embeddings,embeddings[j]);
+            writeLogToCSV(filePath,faceIds.get(j),NaN,similarity_with_new);
+        }else {
+            user_old.embeddings = subMeanEmbeddings(embeddings[j], user_old.embeddings, user_old.n);
+            user_old.n = user_old.n - 1;
+            db.userDao().updateUser(user_old);
+            float similarity_with_old = similarity(user_old.embeddings, embeddings[j]);
+            float similarity_with_new = similarity(user_new.embeddings, embeddings[j]);
+            writeLogToCSV(filePath, faceIds.get(j), similarity_with_old, similarity_with_new);
+        }
+        List<Face> faces=db.faceDao().loadAllByUserIds(user_old.uid);
+        checkFaces(faces,user_old,user_new);
     }
     void checkFaces(List<Face>faces,User user_old,User user_new){
         float[] oldEM=user_old.embeddings;

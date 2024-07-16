@@ -29,6 +29,7 @@ public class FaceDetection_Activity{
         image = InputImage.fromBitmap(bitmap,0);
     }
     protected void detectFaces(FaceDetectionCallback callback){
+        float thresholdRatio=0.45f;
         FaceDetector detector = FaceDetection.getClient();
         Task<List<Face>> result =
                 detector.process(image)
@@ -38,47 +39,27 @@ public class FaceDetection_Activity{
                                     public void onSuccess(List<Face> faces) {
                                         // Task completed successfully
                                         // ...
+                                        List<Rect>rects=new ArrayList<>();
+                                        ArrayList<Rect>finalRects=new ArrayList<>();
                                         List<Float> rollAngles= new ArrayList<>();
+                                        List<Float> finalRollAngles= new ArrayList<>();
+
                                         float mxWidth = 0.01f;
                                         for( Face face:faces){
                                             Rect bounds = face.getBoundingBox();
                                             mxWidth = Math.max(mxWidth,bounds.width());
-                                        }
-                                        detectFacesWithThreshold(callback,mxWidth);
-                                    }
-                                })
-                        .addOnFailureListener(
-                                new OnFailureListener() {
-                                    @Override
-                                    public void onFailure(@NonNull Exception e) {
-                                        // Task failed with an exception
-                                        // ...
-                                        callback.onFaceDetectionFailed(e);
-                                    }
-                                });
-    }
-    protected void detectFacesWithThreshold(FaceDetectionCallback callback, float mxWidth){
-        float minFaceSize = 0.45f * mxWidth ;
-        FaceDetector detector = FaceDetection.getClient();
-        ArrayList<Rect> rects=new ArrayList<>();
-        Task<List<Face>> result =
-                detector.process(image)
-                        .addOnSuccessListener(
-                                new OnSuccessListener<List<Face>>() {
-                                    @Override
-                                    public void onSuccess(List<Face> faces) {
-                                        // Task completed successfully
-                                        // ...
-                                        List<Float> rollAngles= new ArrayList<>();
-                                        for( Face face:faces){
-                                            Rect bounds = face.getBoundingBox();
-                                            if(bounds.width() < minFaceSize){
-                                                continue;
-                                            }
-                                            rollAngles.add(face.getHeadEulerAngleZ());
                                             rects.add(bounds);
+                                            rollAngles.add(face.getHeadEulerAngleZ());
                                         }
-                                        callback.onFacesDetected(rects,rollAngles);
+                                        for(int i=0;i<rects.size();i++){
+                                            Rect rect= rects.get(i);
+                                            float rollAngle=rollAngles.get(i);
+                                            if(rect.width() >= thresholdRatio * mxWidth) {
+                                                finalRects.add(rect);
+                                                finalRollAngles.add(rollAngle);
+                                            }
+                                        }
+                                        callback.onFacesDetected(finalRects,finalRollAngles);
                                     }
                                 })
                         .addOnFailureListener(
@@ -91,5 +72,4 @@ public class FaceDetection_Activity{
                                     }
                                 });
     }
-
 }

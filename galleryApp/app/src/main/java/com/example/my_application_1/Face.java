@@ -14,12 +14,18 @@ public class Face {
     public int uid;
     @TypeConverters(Converters.class)
     public float[] embeddings;
+    @TypeConverters(Converters.class)
+    public float[] coordinates;
+    @ColumnInfo(name = "rollAngle")
+    public float rollAngle;
     @ColumnInfo(name="filePath")
-    String filePath;
+    public String filePath;
     @ColumnInfo(name="userID")
     public int userID;
 
-    public Face(float[] embeddings,String filePath,int userID){
+    public Face(float[] embeddings,float[] coordinates,float rollAngle, String filePath,int userID){
+        this.rollAngle=rollAngle;
+        this.coordinates=coordinates;
         this.embeddings=embeddings;
         this.filePath=filePath;
         this.userID=userID;
