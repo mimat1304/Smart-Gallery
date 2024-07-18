@@ -257,7 +257,6 @@ public class image_view extends AppCompatActivity {
                 }
             }
         }
-        Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         onResume();
     }
     private void showDialog(List<User> users_new,User user_old,int j) throws IOException {
@@ -390,6 +389,12 @@ public class image_view extends AppCompatActivity {
                 Log.d("checkFaces","User not updated for face "+face.uid);
             }
         }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(image_view.this, "Saved", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
     private void writeLogToCSV(String filePath,int faceId, double similarity1, double similarity2) {
         String FILE_NAME="logs.csv";

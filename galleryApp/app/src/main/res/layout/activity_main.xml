@@ -16,6 +16,7 @@
         android:numColumns="4"
         android:stretchMode="columnWidth"
         android:verticalSpacing="4dp" />
+
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/shareLayout"
         android:layout_width="416dp"
@@ -25,7 +26,21 @@
         app:layout_constraintStart_toStartOf="parent">
 
         <Button
+            android:id="@+id/addMore"
+            android:layout_width="170dp"
+            android:layout_height="56dp"
+            android:onClick="openImagePicker"
+            android:text="Add More"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/share"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+
+
+        <Button
             android:id="@+id/share"
+            android:layout_marginLeft="200dp"
             android:layout_width="170dp"
             android:layout_height="56dp"
             android:onClick="shareGroup"
@@ -34,6 +49,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

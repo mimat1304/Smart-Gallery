@@ -1,6 +1,8 @@
 package com.example.my_application_1;
 
 import android.Manifest;
+import android.app.Activity;
+import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -18,7 +20,10 @@ import android.os.Build;
 import android.os.Bundle;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -36,7 +41,12 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -44,6 +54,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -55,7 +66,9 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     public Button share;
 
     public Set<String> selected = new HashSet<>();
-    private List<String> imagePaths;
+    ConcurrentLinkedQueue<String> imagePaths = new ConcurrentLinkedQueue<>();
+    List<String> listOfImagePaths=new ArrayList<>();
+    Set<String> setImagePaths= new HashSet<>();
     public ArrayList<Rect>rects;
     private ArrayList<Bitmap> croppedFaces;
     private float[][] embeddings;
@@ -63,9 +76,8 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     List<User>userList=new ArrayList<>();
     private AppDatabase db;
     private ExecutorService userExecutiveService;
-    int allFilesSize;
-
     private static final int PERMISSION_REQUEST_CODE = 100;
+    private ActivityResultLauncher<Intent> pickImagesLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,12 +95,91 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         db = AppDatabase.getInstance(getApplicationContext());
         userExecutiveService = Executors.newSingleThreadExecutor();
 
-        requestPermissions();
+        pickImagesLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                        boolean flag=false;
+                        if(imagePaths.isEmpty()){
+                            flag=true;
+                        }
+                        handleImageSelection(result.getData());
+                        initializeUiOfApp();
+                        if(flag){// to handle the case if face recognition has stopped before queue extension
+                            backgroundFaceRecognition();
+                        }
+                    }
+                }
+        );
+        String imagesFileName = "imagePaths.txt";
+        File imagesFile = new File(getFilesDir(),imagesFileName);
+        if(imagesFile.exists()){
+            try (FileInputStream fis = openFileInput(imagesFileName);
+                 InputStreamReader isr = new InputStreamReader(fis);
+                 BufferedReader br = new BufferedReader(isr)) {
 
+                String line;
+                while ((line = br.readLine()) != null) {
+                    listOfImagePaths.add(line);
+                    imagePaths.add(line);
+                    setImagePaths.add(line);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        requestPermissions();
     }
     protected void onResume() {
         super.onResume();
         userExecutiveService.submit(()->userList = db.userDao().getAll());
+    }
+
+    public void openImagePicker(View v) {
+        Intent intent = new Intent(Intent.ACTION_PICK);
+        intent.setType("image/*");
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        pickImagesLauncher.launch(intent);
+    }
+    private void handleImageSelection(Intent data) {
+        if (data.getClipData() != null) {
+            int count = data.getClipData().getItemCount();
+            for (int i = 0; i < count; i++) {
+                ClipData.Item item = data.getClipData().getItemAt(i);
+                Uri imageUri = item.getUri();
+                String imagePath = getPathFromUri(imageUri);
+                if (imagePath != null) {
+                    if(!setImagePaths.contains(imagePath)) {
+                        listOfImagePaths.add(imagePath);
+                        imagePaths.add(imagePath);
+                        setImagePaths.add(imagePath);
+                    }
+                }
+            }
+        } else if (data.getData() != null) {
+            Uri imageUri = data.getData();
+            String imagePath = getPathFromUri(imageUri);
+            if (imagePath != null) {
+                if(!setImagePaths.contains(imagePath)) {
+                    listOfImagePaths.add(imagePath);
+                    imagePaths.add(imagePath);
+                    setImagePaths.add(imagePath);
+                }
+            }
+        }
+
+    }
+    private String getPathFromUri(Uri uri) {
+        String[] projection = { MediaStore.Images.Media.DATA };
+        Cursor cursor = getContentResolver().query(uri, projection, null, null, null);
+        if (cursor != null) {
+            int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+            cursor.moveToFirst();
+            String path = cursor.getString(column_index);
+            cursor.close();
+            return path;
+        }
+        return null;
     }
     private void requestPermissions(){
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -98,7 +189,8 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.READ_MEDIA_IMAGES}, PERMISSION_REQUEST_CODE);
             } else {
-                initializeApp();
+                initializeUiOfApp();
+                backgroundFaceRecognition();
             }
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Android 10 (API level 29) to Android 12 (API level 32)
@@ -107,7 +199,8 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
             } else {
-                initializeApp();
+                initializeUiOfApp();
+                backgroundFaceRecognition();
             }
         } else {
             // Android 9 (API level 28) and below
@@ -116,16 +209,25 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
             } else {
-                initializeApp();
+                initializeUiOfApp();
+                backgroundFaceRecognition();
             }
         }
     }
-    public void initializeApp(){
+    public void initializeUiOfApp(){
         galleryListView = findViewById(R.id.gallery);
-        imagePaths = loadImagesFromGallery();
-
-        galleryAdapter = new GalleryAdapter(this, imagePaths);
+        galleryAdapter = new GalleryAdapter(this, listOfImagePaths);
         galleryListView.setAdapter(galleryAdapter);
+        String imagesFileName = "imagePaths.txt";
+        try (FileOutputStream fos = openFileOutput(imagesFileName, MODE_PRIVATE)) { // clears already existing data and re-writes the file
+            for(String filePath: listOfImagePaths){
+                fos.write((filePath + "\n").getBytes());
+            }
+        } catch (IOException e) {
+            Log.e("image_view", "Error writing to CSV file", e);
+        }
+    }
+    public void backgroundFaceRecognition(){
         Log.d("MainActivity", "Starting background thread");
         Thread workThread = new Thread() {
             @Override
@@ -150,7 +252,8 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Permission granted", Toast.LENGTH_SHORT).show();
-                initializeApp();
+                initializeUiOfApp();
+                backgroundFaceRecognition();
             } else {
                 Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show();
             }
@@ -258,9 +361,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     public void okShare(View v){
         selected.clear();
         setContentView(R.layout.activity_main);
-        galleryListView = findViewById(R.id.gallery);
-        galleryAdapter = new GalleryAdapter(this, imagePaths);
-        galleryListView.setAdapter(galleryAdapter);
+        initializeUiOfApp();
         share = findViewById(R.id.share);
         share.setVisibility(View.INVISIBLE);
         stateSelection = false;
@@ -268,31 +369,11 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     public void cancelShare(View v){
         selected.clear();
         setContentView(R.layout.activity_main);
-        galleryListView = findViewById(R.id.gallery);
-        galleryAdapter = new GalleryAdapter(this, imagePaths);
-        galleryListView.setAdapter(galleryAdapter);
+        initializeUiOfApp();
         share = findViewById(R.id.share);
         share.setVisibility(View.INVISIBLE);
         stateSelection = false;
     }
-    private List<String> loadImagesFromGallery() {
-        List<String> imagePaths = new ArrayList<>();
-        Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
-        String[] projection = { MediaStore.MediaColumns.DATA };
-        Cursor cursor = getContentResolver().query(uri, projection, null, null, null);
-
-        if (cursor != null) {
-            while (cursor.moveToNext()) {
-                String path = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA));
-                imagePaths.add(path);
-            }
-            cursor.close();
-        }
-        allFilesSize=imagePaths.size();
-        Collections.reverse(imagePaths);
-        return imagePaths;
-    }
-
     private void processData() throws IOException {
         Set<String> fileSet = new HashSet<>();
         List<String> allFiles= db.faceDao().loadAllFiles();
@@ -300,13 +381,23 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
         int count=0;
         int ptr=0;
         boolean flag=false;
-        for(String filePath: imagePaths){
+        while(!imagePaths.isEmpty()){
             ptr++;
-            if(filePath.equals(imagePaths.get(imagePaths.size()-1))){
+            String filePath=imagePaths.poll();
+            if(imagePaths.isEmpty()){
                 flag=true;
             }
             if(fileSet.contains(filePath)) {
                 count++;
+                if(flag){
+                    Log.d("MainActivity","Database work done");
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(MainActivity.this,"Database work done",Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             }
             else{
                 Bitmap bitmap = handleSamplingAndRotationBitmap(filePath);
@@ -314,7 +405,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             }
 //            if(ptr==17)break;
         }
-        Log.d("Total new files",""+(allFilesSize-count));
+        Log.d("Total new files",""+(ptr-count));
     }
     protected void faceDetection(String filePath,Bitmap bitmap,boolean flag){
         FaceDetectionCallback callback= new FaceDetectionCallback() {
@@ -433,6 +524,15 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             checkUsers(em,filePath,flag,rollAngles.get(i),rects.get(i));
             i++;
         }
+        if(flag){
+            Log.d("MainActivity","Database work done");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(MainActivity.this,"Database work done",Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
     }
     private void checkUsers(float[] cur_em,String filePath,boolean flag,float rollAngle,Rect faceRect){
         float maxThreshold = -1f;
@@ -475,16 +575,6 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             userList.set(maxThresholdInd,user);
             db.userDao().updateUser(user);
             db.faceDao().insert(face);
-        }
-        if(flag){
-            Log.d("MainActivity","Database work done");
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    Toast.makeText(MainActivity.this,"Database work done",Toast.LENGTH_SHORT).show();
-                }
-            });
-
         }
     }
     private float[] meanEmbeddings(float[] cur_em,float[] em,int n){
