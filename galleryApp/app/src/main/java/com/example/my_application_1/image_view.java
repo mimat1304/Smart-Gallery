@@ -397,16 +397,17 @@ public class image_view extends AppCompatActivity {
         });
     }
     private void writeLogToCSV(String filePath,int faceId, double similarity1, double similarity2) {
+        Face face = db.faceDao().getFaceFromUid(faceId);
         String FILE_NAME="logs.csv";
         File csvFile = new File(getFilesDir(), FILE_NAME);
         boolean flag=false;
-        if(!csvFile.exists()){
-            flag=true;
+        if(!csvFile.exists()) {
+            flag = true;
         }
-        String csvRow = filePath + "," + faceId + "," + similarity1 + "," + similarity2;
+        String csvRow = filePath + "," + faceId + "," + face.rollAngle + "," + face.coordinates[0] + "," + face.coordinates[1] + "," + face.coordinates[2] + "," + face.coordinates[3] + "," + similarity1 + "," + similarity2;
         try (FileOutputStream fos = openFileOutput(FILE_NAME, MODE_APPEND)) {
             if (flag) {
-                String headers = "FilePath,FaceId,Similarity with previous cluster,Similarity with new cluster";
+                String headers = "FilePath,FaceId,Z Angle,Left,Top,Right,Bottom,Similarity with previous cluster,Similarity with new cluster";
                 fos.write((headers + "\n").getBytes());
             }
             fos.write((csvRow + "\n").getBytes());
