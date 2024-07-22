@@ -129,6 +129,8 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             }
         }
         requestPermissions();
+        Intent intent = new Intent(this, LogcatService.class);
+        startService(intent);
     }
     protected void onResume() {
         super.onResume();
@@ -400,8 +402,13 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 }
             }
             else{
-                Bitmap bitmap = handleSamplingAndRotationBitmap(filePath);
-                faceDetection(filePath,bitmap,flag);
+                try{
+                    Bitmap bitmap = handleSamplingAndRotationBitmap(filePath);
+                    faceDetection(filePath,bitmap,flag);
+                }catch (Exception e){
+                    Log.e("MainActivity",filePath,e);
+                }
+
             }
 //            if(ptr==17)break;
         }
@@ -521,7 +528,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     protected void updateData(String filePath,boolean flag,List<Float> rollAngles){
         int i=0;
         for(float[] em:embeddings){
-            checkUsers(em,filePath,flag,rollAngles.get(i),rects.get(i));
+            checkUsers(em,filePath,rollAngles.get(i),rects.get(i));
             i++;
         }
         if(flag){
@@ -534,7 +541,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
             });
         }
     }
-    private void checkUsers(float[] cur_em,String filePath,boolean flag,float rollAngle,Rect faceRect){
+    private void checkUsers(float[] cur_em,String filePath,float rollAngle,Rect faceRect){
         float maxThreshold = -1f;
         float threshold=0.63f;
         int maxThresholdInd = -1;
@@ -564,7 +571,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
                 db.userDao().insert(user);
                 db.faceDao().insert(face);
             }catch (Exception e){
-                Log.e("!flag","error",e);
+                Log.e("checkUsers","error",e);
             }
         }else{
             User user= userList.get(maxThresholdInd);
@@ -609,5 +616,7 @@ public class MainActivity extends AppCompatActivity implements GalleryAdapter.On
     protected void onDestroy() {
         super.onDestroy();
         userExecutiveService.shutdown();
+        Intent intent = new Intent(this, LogcatService.class);
+        stopService(intent);
     }
 }
